@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"C:/Users/HP/OneDrive/Desktop/Marnand piles web site/Tender TSK \\(1\\).docx\" -o /tmp/tender_tsk.md)",
+      "Bash(python scripts/office/unpack.py \"C:/Users/HP/OneDrive/Desktop/Marnand piles web site/Tender TSK \\(1\\).docx\" /tmp/tender_unpacked/)"
+    ]
+  }
+}
