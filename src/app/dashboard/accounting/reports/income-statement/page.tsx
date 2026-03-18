@@ -105,17 +105,7 @@ export default function IncomeStatementPage() {
             </p>
             <p className="text-sm text-muted-foreground">
               For the period{" "}
-              {new Date(periodFrom).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}{" "}
-              to{" "}
-              {new Date(periodTo).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {periodFrom} to {periodTo}
             </p>
           </CardHeader>
           <CardContent className="space-y-6">

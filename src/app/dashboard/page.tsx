@@ -245,13 +245,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(log.created_at).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {log.created_at}
                 </span>
               </div>
             ))}

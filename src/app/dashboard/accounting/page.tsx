@@ -270,7 +270,7 @@ export default function AccountingJournalEntriesPage() {
                 filteredEntries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="whitespace-nowrap">
-                      {new Date(entry.date).toLocaleDateString()}
+                      {entry.date}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{entry.reference_number}</Badge>

@@ -101,7 +101,7 @@ export default function BalanceSheetPage() {
               Balance Sheet
             </p>
             <p className="text-sm text-muted-foreground">
-              As of {new Date(asOfDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+              As of {asOfDate}
             </p>
           </CardHeader>
           <CardContent className="space-y-6">

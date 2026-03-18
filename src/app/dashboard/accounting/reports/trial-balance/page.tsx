@@ -79,11 +79,7 @@ export default function TrialBalancePage() {
             </p>
             <p className="text-sm text-muted-foreground">
               As of{" "}
-              {new Date(asOfDate).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {asOfDate}
             </p>
           </CardHeader>
           <CardContent className="p-0">
