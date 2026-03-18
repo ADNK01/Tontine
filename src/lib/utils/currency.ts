@@ -1,23 +1,23 @@
-const currencyConfig: Record<string, { symbol: string; locale: string; decimals: number }> = {
-  RWF: { symbol: "FRw", locale: "rw-RW", decimals: 0 },
-  USD: { symbol: "$", locale: "en-US", decimals: 2 },
-  EUR: { symbol: "€", locale: "fr-FR", decimals: 2 },
-  GBP: { symbol: "£", locale: "en-GB", decimals: 2 },
-  XOF: { symbol: "CFA", locale: "fr-ML", decimals: 0 },
+const currencyConfig: Record<string, { symbol: string; decimals: number }> = {
+  RWF: { symbol: "RWF", decimals: 0 },
+  USD: { symbol: "$", decimals: 2 },
+  EUR: { symbol: "€", decimals: 2 },
+  GBP: { symbol: "£", decimals: 2 },
+  XOF: { symbol: "CFA", decimals: 0 },
 };
 
+function formatNumber(amount: number, decimals: number): string {
+  const fixed = Math.abs(amount).toFixed(decimals);
+  const [intPart, decPart] = fixed.split(".");
+  // Add thousand separators using simple regex
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sign = amount < 0 ? "-" : "";
+  return decPart ? `${sign}${withCommas}.${decPart}` : `${sign}${withCommas}`;
+}
+
 export function formatCurrency(amount: number, currency: string = "RWF"): string {
-  const config = currencyConfig[currency] || { symbol: currency, locale: "en-US", decimals: 2 };
-  try {
-    return new Intl.NumberFormat(config.locale, {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: config.decimals,
-      maximumFractionDigits: config.decimals,
-    }).format(amount);
-  } catch {
-    return `${config.symbol} ${amount.toLocaleString("en-US", { minimumFractionDigits: config.decimals, maximumFractionDigits: config.decimals })}`;
-  }
+  const config = currencyConfig[currency] || { symbol: currency, decimals: 2 };
+  return `${config.symbol} ${formatNumber(amount, config.decimals)}`;
 }
 
 export function getCurrencySymbol(currency: string): string {
@@ -25,7 +25,7 @@ export function getCurrencySymbol(currency: string): string {
 }
 
 export const supportedCurrencies = [
-  { code: "RWF", name: "Rwandan Franc", symbol: "FRw" },
+  { code: "RWF", name: "Rwandan Franc", symbol: "RWF" },
   { code: "USD", name: "US Dollar", symbol: "$" },
   { code: "EUR", name: "Euro", symbol: "€" },
   { code: "GBP", name: "British Pound", symbol: "£" },
