@@ -168,13 +168,13 @@ export default function LoanPARPage() {
                     outerRadius={100}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
                   >
                     {agingData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={AGING_COLORS[index % AGING_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value, "RWF")} />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value), "RWF")} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>

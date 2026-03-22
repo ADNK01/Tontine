@@ -210,7 +210,7 @@ export default function FinancialSummaryPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value, "RWF")} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value), "RWF")} />
                 <Legend />
                 <Bar dataKey="Revenue" fill="#22c55e" />
                 <Bar dataKey="Expenses" fill="#ef4444" />
@@ -232,7 +232,7 @@ export default function FinancialSummaryPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value, "RWF")} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value), "RWF")} />
                 <Legend />
                 <Line
                   type="monotone"

@@ -250,8 +250,8 @@ export default function DashboardPage() {
                     }
                   />
                   <Tooltip
-                    formatter={(value: number) => [
-                      formatCurrency(value),
+                    formatter={(value) => [
+                      formatCurrency(Number(value)),
                       "Balance",
                     ]}
                   />
