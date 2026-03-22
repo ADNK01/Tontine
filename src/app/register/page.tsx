@@ -15,10 +15,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UserPlus } from "lucide-react";
+import { signUp } from "@/lib/services/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -33,12 +36,84 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
-    // Demo mode: just redirect to dashboard
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 500);
+
+    try {
+      const data = await signUp(form.email, form.password, form.fullName, form.organization);
+      // If session exists, email confirmation is disabled — go straight to dashboard
+      if (data.session) {
+        router.push("/dashboard");
+        return;
+      }
+      setSuccess(true);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred";
+      if (message.includes("already registered")) {
+        setError("An account with this email already exists.");
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-lg font-bold text-white">
+                T
+              </div>
+              <span className="text-2xl font-bold text-gray-900">TSK</span>
+            </Link>
+          </div>
+
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="text-xl">Check your email</CardTitle>
+              <CardDescription>
+                We sent a confirmation link to{" "}
+                <span className="font-medium text-gray-900">{form.email}</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                Please check your email and click the confirmation link to
+                activate your account.
+              </div>
+            </CardContent>
+            <CardFooter className="justify-center">
+              <p className="text-sm text-muted-foreground">
+                Already confirmed?{" "}
+                <Link
+                  href="/login"
+                  className="font-medium text-blue-600 hover:underline"
+                >
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-8">
@@ -61,10 +136,11 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Demo notice */}
-            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              Demo Mode - Click Register to enter
-            </div>
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -75,6 +151,7 @@ export default function RegisterPage() {
                   placeholder="John Doe"
                   value={form.fullName}
                   onChange={(e) => updateField("fullName", e.target.value)}
+                  required
                   className="h-9"
                 />
               </div>
@@ -86,6 +163,7 @@ export default function RegisterPage() {
                   placeholder="name@example.com"
                   value={form.email}
                   onChange={(e) => updateField("email", e.target.value)}
+                  required
                   className="h-9"
                 />
               </div>
@@ -105,9 +183,10 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder="Create a password (min. 6 characters)"
                   value={form.password}
                   onChange={(e) => updateField("password", e.target.value)}
+                  required
                   className="h-9"
                 />
               </div>
@@ -121,6 +200,7 @@ export default function RegisterPage() {
                   onChange={(e) =>
                     updateField("confirmPassword", e.target.value)
                   }
+                  required
                   className="h-9"
                 />
               </div>

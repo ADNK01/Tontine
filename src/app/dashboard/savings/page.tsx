@@ -162,7 +162,7 @@ export default function SavingsAccountsPage() {
             Manage member savings accounts and transactions.
           </p>
         </div>
-        <Button render={<Link href="/dashboard/savings/deposit" />}>
+        <Button render={<Link href="/dashboard/savings/new" />}>
             <Plus className="mr-2 h-4 w-4" />
             New Account
         </Button>

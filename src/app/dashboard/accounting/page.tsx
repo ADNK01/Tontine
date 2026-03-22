@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Plus, Search, BookOpen } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Search, BookOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,10 +29,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { demoAccountingEntries, demoChartOfAccounts } from "@/lib/demo-data";
 import { formatCurrency } from "@/lib/utils/currency";
+import {
+  getAccountingEntries,
+  getChartOfAccounts,
+  createAccountingEntry,
+} from "@/lib/services/accounting";
+import type { AccountingEntry, ChartOfAccount } from "@/lib/types/database";
+import { toast } from "sonner";
 
 export default function AccountingJournalEntriesPage() {
+  const [entries, setEntries] = useState<AccountingEntry[]>([]);
+  const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -47,16 +58,35 @@ export default function AccountingJournalEntriesPage() {
     currency: "RWF",
   });
 
-  const accountMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const acc of demoChartOfAccounts) {
-      map[acc.id] = acc.name;
+  async function fetchData() {
+    try {
+      const [entriesData, accountsData] = await Promise.all([
+        getAccountingEntries(),
+        getChartOfAccounts(),
+      ]);
+      setEntries(entriesData);
+      setAccounts(accountsData);
+    } catch (error) {
+      console.error("Failed to fetch accounting data:", error);
+    } finally {
+      setLoading(false);
     }
-    return map;
+  }
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
+  const accountMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const acc of accounts) {
+      map[acc.id] = `${acc.code} - ${acc.name}`;
+    }
+    return map;
+  }, [accounts]);
+
   const filteredEntries = useMemo(() => {
-    return demoAccountingEntries.filter((entry) => {
+    return entries.filter((entry) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!entry.description.toLowerCase().includes(q)) return false;
@@ -65,19 +95,66 @@ export default function AccountingJournalEntriesPage() {
       if (dateTo && entry.date > dateTo) return false;
       return true;
     });
-  }, [searchQuery, dateFrom, dateTo]);
+  }, [searchQuery, dateFrom, dateTo, entries]);
 
-  const handleNewEntry = () => {
-    setDialogOpen(false);
-    setNewEntry({
-      date: "",
-      description: "",
-      debit_account_id: "",
-      credit_account_id: "",
-      amount: "",
-      currency: "RWF",
-    });
-  };
+  async function handleNewEntry() {
+    if (!newEntry.date || !newEntry.description || !newEntry.debit_account_id || !newEntry.credit_account_id || !newEntry.amount) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    const parsedAmount = parseFloat(newEntry.amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+
+    if (newEntry.debit_account_id === newEntry.credit_account_id) {
+      toast.error("Debit and credit accounts must be different.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await createAccountingEntry({
+        date: newEntry.date,
+        description: newEntry.description,
+        debit_account_id: newEntry.debit_account_id,
+        credit_account_id: newEntry.credit_account_id,
+        amount: parsedAmount,
+        currency: newEntry.currency,
+        source_type: "manual",
+      });
+
+      toast.success("Journal entry created successfully!");
+      setDialogOpen(false);
+      setNewEntry({
+        date: "",
+        description: "",
+        debit_account_id: "",
+        credit_account_id: "",
+        amount: "",
+        currency: "RWF",
+      });
+
+      // Refresh entries
+      setLoading(true);
+      await fetchData();
+    } catch (error) {
+      toast.error("Failed to create journal entry. Please try again.");
+      console.error("Create entry error:", error);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -95,8 +172,8 @@ export default function AccountingJournalEntriesPage() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button />}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Entry
+            <Plus className="mr-2 h-4 w-4" />
+            New Entry
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
@@ -137,7 +214,7 @@ export default function AccountingJournalEntriesPage() {
                     <SelectValue placeholder="Select debit account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {demoChartOfAccounts.map((acc) => (
+                    {accounts.map((acc) => (
                       <SelectItem key={acc.id} value={acc.id}>
                         {acc.code} - {acc.name}
                       </SelectItem>
@@ -157,7 +234,7 @@ export default function AccountingJournalEntriesPage() {
                     <SelectValue placeholder="Select credit account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {demoChartOfAccounts.map((acc) => (
+                    {accounts.map((acc) => (
                       <SelectItem key={acc.id} value={acc.id}>
                         {acc.code} - {acc.name}
                       </SelectItem>
@@ -191,13 +268,15 @@ export default function AccountingJournalEntriesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="RWF">RWF</SelectItem>
+                      <SelectItem value="XOF">XOF</SelectItem>
                       <SelectItem value="USD">USD</SelectItem>
                       <SelectItem value="EUR">EUR</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <Button onClick={handleNewEntry} className="mt-2">
+              <Button onClick={handleNewEntry} disabled={submitting} className="mt-2">
+                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Entry
               </Button>
             </div>
@@ -262,7 +341,10 @@ export default function AccountingJournalEntriesPage() {
             <TableBody>
               {filteredEntries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center py-8 text-muted-foreground"
+                  >
                     No journal entries found.
                   </TableCell>
                 </TableRow>
@@ -273,14 +355,18 @@ export default function AccountingJournalEntriesPage() {
                       {entry.date}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{entry.reference_number}</Badge>
+                      <Badge variant="outline">
+                        {entry.reference_number}
+                      </Badge>
                     </TableCell>
                     <TableCell>{entry.description}</TableCell>
                     <TableCell>
-                      {accountMap[entry.debit_account_id] || entry.debit_account_id}
+                      {accountMap[entry.debit_account_id] ||
+                        entry.debit_account_id}
                     </TableCell>
                     <TableCell>
-                      {accountMap[entry.credit_account_id] || entry.credit_account_id}
+                      {accountMap[entry.credit_account_id] ||
+                        entry.credit_account_id}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(entry.amount, entry.currency)}
@@ -289,7 +375,7 @@ export default function AccountingJournalEntriesPage() {
                       {entry.source_type ? (
                         <Badge variant="secondary">{entry.source_type}</Badge>
                       ) : (
-                        <span className="text-muted-foreground">manual</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
                   </TableRow>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,8 @@ import {
   LogOut,
   ChevronDown,
 } from "lucide-react";
+import { signOut, getUser } from "@/lib/services/auth";
+import type { User } from "@supabase/supabase-js";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -80,6 +82,22 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function getUserDisplayName(user: User | null): string {
+  if (!user) return "User";
+  const fullName = user.user_metadata?.full_name;
+  if (fullName) return fullName;
+  return user.email?.split("@")[0] ?? "User";
+}
+
+function getUserInitials(user: User | null): string {
+  const name = getUserDisplayName(user);
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -87,10 +105,27 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    getUser()
+      .then(setUser)
+      .catch(() => {
+        // User not authenticated - middleware should handle redirect
+      });
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch {
+      // Ignore sign out errors
+    }
     router.push("/login");
   };
+
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(user);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -153,10 +188,10 @@ export default function DashboardLayout({
               }
             >
               <Avatar size="sm">
-                <AvatarFallback>AD</AvatarFallback>
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <span className="hidden font-medium text-gray-700 sm:inline">
-                Admin Demo
+                {displayName}
               </span>
               <ChevronDown className="h-4 w-4 text-gray-400" />
             </DropdownMenuTrigger>

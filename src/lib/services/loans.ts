@@ -102,7 +102,6 @@ export async function createRepayment(repayment: {
   if (error) throw error;
 
   // Update loan outstanding balance
-  await supabase.rpc("", {}).catch(() => {});
   const { data: loan } = await supabase
     .from("loans")
     .select("outstanding_balance, total_repaid")

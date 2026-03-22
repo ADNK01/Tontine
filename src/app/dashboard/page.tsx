@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Users, Banknote, PiggyBank, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, Banknote, PiggyBank, TrendingUp, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,14 +10,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils/currency";
-import {
-  demoProfile,
-  demoMembers,
-  demoLoans,
-  demoSavingsAccounts,
-  demoAccountingEntries,
-  demoAuditLogs,
-} from "@/lib/demo-data";
+import { getMembers } from "@/lib/services/members";
+import { getLoans } from "@/lib/services/loans";
+import { getSavingsAccounts } from "@/lib/services/savings";
+import { createClient } from "@/lib/supabase/client";
+import type { Member, Loan, SavingsAccount, AuditLog } from "@/lib/types/database";
 import {
   PieChart,
   Pie,
@@ -35,41 +32,62 @@ import {
 const COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function DashboardPage() {
-  const totalMembers = demoMembers.length;
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const activeLoans = demoLoans.filter(
+  useEffect(() => {
+    async function fetchAll() {
+      try {
+        const supabase = createClient();
+        const [membersData, loansData, savingsData, logsResult] =
+          await Promise.all([
+            getMembers(),
+            getLoans(),
+            getSavingsAccounts(),
+            supabase
+              .from("audit_logs")
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(5),
+          ]);
+        setMembers(membersData);
+        setLoans(loansData);
+        setSavingsAccounts(savingsData);
+        setAuditLogs(logsResult.data || []);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAll();
+  }, []);
+
+  const totalMembers = members.length;
+  const activeMembers = members.filter((m) => m.status === "active").length;
+
+  const activeLoans = loans.filter(
     (l) => l.status === "active" || l.status === "disbursed"
   );
   const activeLoansCount = activeLoans.length;
   const activeLoansTotal = activeLoans.reduce(
-    (sum, l) => sum + l.outstanding_balance,
+    (sum, l) => sum + (l.outstanding_balance || 0),
     0
   );
 
-  const totalSavings = demoSavingsAccounts.reduce(
-    (sum, sa) => sum + sa.balance,
+  const totalSavings = savingsAccounts.reduce(
+    (sum, sa) => sum + (sa.balance || 0),
     0
   );
 
-  const revenueThisMonth = demoAccountingEntries
-    .filter((ae) => {
-      return (
-        ae.credit_account_id === "coa-8" ||
-        ae.credit_account_id === "coa-9" ||
-        ae.credit_account_id === "coa-10"
-      );
-    })
-    .reduce((sum, ae) => sum + ae.amount, 0);
-
-  const recentLogs = [...demoAuditLogs]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    .slice(0, 5);
+  // Revenue: sum of repaid interest from loans (total_repaid - principal repaid approximation)
+  const totalRepaid = loans.reduce((sum, l) => sum + (l.total_repaid || 0), 0);
 
   // Loan portfolio data for pie chart
-  const loanStatusCounts = demoLoans.reduce(
+  const loanStatusCounts = loans.reduce(
     (acc, loan) => {
       acc[loan.status] = (acc[loan.status] || 0) + 1;
       return acc;
@@ -83,21 +101,23 @@ export default function DashboardPage() {
     })
   );
 
-  // Monthly savings growth data (simulated last 6 months)
-  const monthlySavingsData = [
-    { month: "Oct", amount: 320000 },
-    { month: "Nov", amount: 480000 },
-    { month: "Dec", amount: 610000 },
-    { month: "Jan", amount: 720000 },
-    { month: "Feb", amount: 880000 },
-    { month: "Mar", amount: totalSavings },
-  ];
+  // Savings per member for bar chart
+  const savingsBarData = savingsAccounts
+    .filter((sa) => sa.balance > 0)
+    .slice(0, 8)
+    .map((sa) => {
+      const member = members.find((m) => m.id === sa.member_id);
+      const label = member
+        ? `${member.first_name.charAt(0)}. ${member.last_name}`
+        : sa.account_number;
+      return { name: label, amount: sa.balance };
+    });
 
   const stats = [
     {
       title: "Total Members",
       value: totalMembers.toString(),
-      description: `${demoMembers.filter((m) => m.status === "active").length} active`,
+      description: `${activeMembers} active`,
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -113,26 +133,34 @@ export default function DashboardPage() {
     {
       title: "Total Savings",
       value: formatCurrency(totalSavings),
-      description: `${demoSavingsAccounts.length} accounts`,
+      description: `${savingsAccounts.length} accounts`,
       icon: PiggyBank,
       color: "text-purple-600",
       bg: "bg-purple-50",
     },
     {
-      title: "Revenue This Month",
-      value: formatCurrency(revenueThisMonth),
-      description: "From interest & fees",
+      title: "Total Repaid",
+      value: formatCurrency(totalRepaid),
+      description: "From loan repayments",
       icon: TrendingUp,
       color: "text-amber-600",
       bg: "bg-amber-50",
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Welcome back, {demoProfile.full_name}
+          Welcome back, Admin
         </h1>
         <p className="text-muted-foreground">
           Here is an overview of your tontine operations.
@@ -169,56 +197,68 @@ export default function DashboardPage() {
             <CardDescription>Distribution by status</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={loanPieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={4}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {loanPieData.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {loanPieData.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                No loans yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={loanPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={4}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {loanPieData.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Monthly Savings Growth</CardTitle>
-            <CardDescription>Last 6 months</CardDescription>
+            <CardTitle>Savings by Member</CardTitle>
+            <CardDescription>Top savings account balances</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={monthlySavingsData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis
-                  tickFormatter={(value) =>
-                    `${(value / 1000).toFixed(0)}k`
-                  }
-                />
-                <Tooltip
-                  formatter={(value: number) => [
-                    formatCurrency(value),
-                    "Savings",
-                  ]}
-                />
-                <Bar dataKey="amount" fill="#2563eb" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {savingsBarData.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                No savings accounts yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={savingsBarData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis
+                    tickFormatter={(value) =>
+                      `${(value / 1000).toFixed(0)}k`
+                    }
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      formatCurrency(value),
+                      "Balance",
+                    ]}
+                  />
+                  <Bar dataKey="amount" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -231,24 +271,30 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {recentLogs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start justify-between rounded-md border p-3"
-              >
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">
-                    {log.action} - {log.entity_type}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    by {log.user_name}
-                  </p>
+            {auditLogs.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                No recent activity
+              </p>
+            ) : (
+              auditLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-start justify-between rounded-md border p-3"
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {log.action} - {log.entity_type}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {log.user_name ? `by ${log.user_name}` : "System"}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {log.created_at}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {log.created_at}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

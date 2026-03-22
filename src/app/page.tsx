@@ -53,21 +53,21 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="border-b border-gray-100">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 font-bold text-white">
               T
             </div>
             <span className="text-xl font-bold text-gray-900">TSK</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/login">
-              <Button variant="outline" size="lg">
+              <Button variant="outline" size="sm" className="sm:size-lg">
                 Login
               </Button>
             </Link>
             <Link href="/register">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 sm:size-lg">
                 Register
               </Button>
             </Link>
@@ -76,16 +76,16 @@ export default function HomePage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-7xl px-6 py-24 text-center">
-        <h1 className="text-5xl font-bold tracking-tight text-gray-900">
+      <section className="mx-auto max-w-7xl px-4 py-12 text-center sm:px-6 sm:py-24">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-5xl">
           TSK Tontine Management
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-600">
+        <p className="mx-auto mt-4 max-w-2xl text-base text-gray-600 sm:mt-6 sm:text-lg">
           The modern platform for managing your tontine, savings group, or
           cooperative. Track members, loans, savings, and finances with
           confidence.
         </p>
-        <div className="mt-10 flex items-center justify-center gap-4">
+        <div className="mt-8 flex items-center justify-center gap-3 sm:mt-10 sm:gap-4">
           <Link href="/register">
             <Button size="lg" className="h-11 px-8 bg-blue-600 hover:bg-blue-700 text-base">
               Get Started
@@ -100,7 +100,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section className="mx-auto max-w-7xl px-6 pb-24">
+      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-24">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
             <div
