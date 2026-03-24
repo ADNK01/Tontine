@@ -18,7 +18,7 @@ export const demoProfile: Profile = {
   user_id: "user-1",
   organization_id: "org-1",
   full_name: "Dr. TUYISHIMIRE Gratien",
-  role: "admin",
+  role: "super_admin",
   email: "gratien@tsk-tontine.rw",
   phone: "+250 788 000 001",
   created_at: "2024-01-01T00:00:00Z",
@@ -186,5 +186,5 @@ export const demoAuditLogs: AuditLog[] = [
 export const demoProfiles: Profile[] = [
   demoProfile,
   { id: "profile-2", user_id: "user-2", organization_id: "org-1", full_name: "BIMARO Noel", role: "manager", email: "noel@tsk-tontine.rw", phone: "+250 788 000 002", created_at: "2024-01-01T00:00:00Z" },
-  { id: "profile-3", user_id: "user-3", organization_id: "org-1", full_name: "UWASE Claudine", role: "teller", email: "claudine@tsk-tontine.rw", phone: "+250 788 000 003", created_at: "2024-01-15T00:00:00Z" },
+  { id: "profile-3", user_id: "user-3", organization_id: "org-1", full_name: "UWASE Claudine", role: "viewer", email: "claudine@tsk-tontine.rw", phone: "+250 788 000 003", created_at: "2024-01-15T00:00:00Z" },
 ];

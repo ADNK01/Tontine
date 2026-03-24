@@ -59,3 +59,9 @@ export async function updateMember(
   if (error) throw error;
   return data;
 }
+
+export async function deleteMember(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("members").delete().eq("id", id);
+  if (error) throw error;
+}

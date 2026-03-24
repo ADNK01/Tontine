@@ -69,7 +69,6 @@ export async function createDeposit(deposit: {
 }): Promise<SavingsTransaction> {
   const supabase = createClient();
 
-  // Get current balance
   const { data: account } = await supabase
     .from("savings_accounts")
     .select("balance")
@@ -79,7 +78,6 @@ export async function createDeposit(deposit: {
   const currentBalance = account?.balance || 0;
   const newBalance = currentBalance + deposit.amount;
 
-  // Insert transaction
   const { data, error } = await supabase
     .from("savings_transactions")
     .insert({
@@ -94,7 +92,6 @@ export async function createDeposit(deposit: {
     .single();
   if (error) throw error;
 
-  // Update account balance
   await supabase
     .from("savings_accounts")
     .update({
@@ -114,7 +111,6 @@ export async function createWithdrawal(withdrawal: {
 }): Promise<SavingsTransaction> {
   const supabase = createClient();
 
-  // Get current balance
   const { data: account } = await supabase
     .from("savings_accounts")
     .select("balance")
@@ -127,7 +123,6 @@ export async function createWithdrawal(withdrawal: {
   }
   const newBalance = currentBalance - withdrawal.amount;
 
-  // Insert transaction
   const { data, error } = await supabase
     .from("savings_transactions")
     .insert({
@@ -142,7 +137,6 @@ export async function createWithdrawal(withdrawal: {
     .single();
   if (error) throw error;
 
-  // Update account balance
   await supabase
     .from("savings_accounts")
     .update({
@@ -152,4 +146,12 @@ export async function createWithdrawal(withdrawal: {
     .eq("id", withdrawal.account_id);
 
   return data;
+}
+
+export async function deleteSavingsAccount(id: string): Promise<void> {
+  const supabase = createClient();
+  // Delete transactions first (foreign key constraint)
+  await supabase.from("savings_transactions").delete().eq("account_id", id);
+  const { error } = await supabase.from("savings_accounts").delete().eq("id", id);
+  if (error) throw error;
 }

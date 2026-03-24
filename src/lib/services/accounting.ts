@@ -50,3 +50,9 @@ export async function createAccountingEntry(entry: {
   if (error) throw error;
   return data;
 }
+
+export async function deleteAccountingEntry(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("accounting_entries").delete().eq("id", id);
+  if (error) throw error;
+}

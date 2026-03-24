@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "manager" | "teller" | "member";
+export type UserRole = "super_admin" | "manager" | "viewer";
 export type MemberStatus = "active" | "inactive" | "suspended";
 export type LoanStatus = "pending" | "approved" | "disbursed" | "active" | "completed" | "defaulted" | "rejected";
 export type InterestMethod = "flat" | "reducing_balance";

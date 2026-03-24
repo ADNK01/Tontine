@@ -1,6 +1,7 @@
 "use client";
 
-import { Shield } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Shield, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -16,13 +17,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { demoAuditLogs } from "@/lib/demo-data";
+import { getAuditLogs } from "@/lib/services/audit";
+import type { AuditLog } from "@/lib/types/database";
 
 export default function AuditLogPage() {
-  const sortedLogs = [...demoAuditLogs].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAuditLogs()
+      .then(setLogs)
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -40,7 +55,7 @@ export default function AuditLogPage() {
             Activity Log
           </CardTitle>
           <CardDescription>
-            {sortedLogs.length} entries recorded
+            {logs.length} entries recorded
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -55,27 +70,35 @@ export default function AuditLogPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedLogs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="whitespace-nowrap">
-                    {log.created_at}
-                  </TableCell>
-                  <TableCell>{log.user_name}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                      {log.action}
-                    </span>
-                  </TableCell>
-                  <TableCell>{log.entity_type}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {log.details
-                      ? typeof log.details === "string"
-                        ? log.details
-                        : JSON.stringify(log.details)
-                      : "—"}
+              {logs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No audit logs yet.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {log.created_at?.split("T")[0] || "-"}
+                    </TableCell>
+                    <TableCell>{log.user_name || "-"}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                        {log.action}
+                      </span>
+                    </TableCell>
+                    <TableCell>{log.entity_type}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {log.details
+                        ? typeof log.details === "string"
+                          ? log.details
+                          : JSON.stringify(log.details)
+                        : "\u2014"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

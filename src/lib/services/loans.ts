@@ -120,3 +120,11 @@ export async function createRepayment(repayment: {
 
   return data;
 }
+
+export async function deleteLoan(id: string): Promise<void> {
+  const supabase = createClient();
+  // Delete repayments first (foreign key constraint)
+  await supabase.from("loan_repayments").delete().eq("loan_id", id);
+  const { error } = await supabase.from("loans").delete().eq("id", id);
+  if (error) throw error;
+}

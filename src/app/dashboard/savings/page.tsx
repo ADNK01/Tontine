@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Users,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import {
   Card,
@@ -30,31 +31,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils/currency";
-import { getSavingsAccounts } from "@/lib/services/savings";
+import { getSavingsAccounts, deleteSavingsAccount } from "@/lib/services/savings";
 import { getMembers } from "@/lib/services/members";
-import type { SavingsAccount } from "@/lib/types/database";
-import type { Member } from "@/lib/types/database";
+import { createAuditLog } from "@/lib/services/audit";
+import { useRole } from "@/lib/contexts/role-context";
+import type { SavingsAccount, Member } from "@/lib/types/database";
+import { toast } from "sonner";
 
 function statusBadge(status: "active" | "frozen" | "closed") {
   switch (status) {
     case "active":
-      return (
-        <Badge className="bg-green-100 text-green-700 border-green-200">
-          Active
-        </Badge>
-      );
+      return <Badge className="bg-green-100 text-green-700 border-green-200">Active</Badge>;
     case "frozen":
-      return (
-        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
-          Frozen
-        </Badge>
-      );
+      return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">Frozen</Badge>;
     case "closed":
-      return (
-        <Badge className="bg-gray-100 text-gray-700 border-gray-200">
-          Closed
-        </Badge>
-      );
+      return <Badge className="bg-gray-100 text-gray-700 border-gray-200">Closed</Badge>;
   }
 }
 
@@ -63,6 +54,7 @@ export default function SavingsAccountsPage() {
   const [accounts, setAccounts] = useState<SavingsAccount[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const { canEdit, canDelete, userName } = useRole();
 
   useEffect(() => {
     async function fetchData() {
@@ -87,59 +79,42 @@ export default function SavingsAccountsPage() {
     return member ? `${member.first_name} ${member.last_name}` : "Unknown";
   }
 
+  const handleDelete = async (account: SavingsAccount) => {
+    if (!confirm(`Are you sure you want to delete account ${account.account_number}?`)) return;
+    try {
+      await deleteSavingsAccount(account.id);
+      setAccounts((prev) => prev.filter((a) => a.id !== account.id));
+      await createAuditLog({
+        user_name: userName || "Unknown",
+        action: "delete",
+        entity_type: "savings_account",
+        entity_id: account.id,
+        details: { account_number: account.account_number },
+      });
+      toast.success("Savings account deleted successfully.");
+    } catch {
+      toast.error("Failed to delete savings account.");
+    }
+  };
+
   const filteredAccounts = useMemo(() => {
     if (!search.trim()) return accounts;
     const q = search.toLowerCase();
     return accounts.filter((acc) => {
       const memberName = getMemberName(acc.member_id).toLowerCase();
-      return (
-        acc.account_number.toLowerCase().includes(q) ||
-        memberName.includes(q)
-      );
+      return acc.account_number.toLowerCase().includes(q) || memberName.includes(q);
     });
   }, [search, accounts, members]);
 
-  const totalBalance = accounts.reduce(
-    (sum, acc) => sum + acc.balance,
-    0
-  );
-  const activeAccounts = accounts.filter(
-    (acc) => acc.status === "active"
-  ).length;
-  const averageBalance =
-    accounts.length > 0
-      ? totalBalance / accounts.length
-      : 0;
+  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const activeAccounts = accounts.filter((acc) => acc.status === "active").length;
+  const averageBalance = accounts.length > 0 ? totalBalance / accounts.length : 0;
 
   const stats = [
-    {
-      title: "Total Accounts",
-      value: accounts.length.toString(),
-      icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-    },
-    {
-      title: "Total Balance",
-      value: formatCurrency(totalBalance),
-      icon: Wallet,
-      color: "text-green-600",
-      bg: "bg-green-50",
-    },
-    {
-      title: "Active Accounts",
-      value: activeAccounts.toString(),
-      icon: PiggyBank,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
-    },
-    {
-      title: "Average Balance",
-      value: formatCurrency(averageBalance),
-      icon: TrendingUp,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
-    },
+    { title: "Total Accounts", value: accounts.length.toString(), icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+    { title: "Total Balance", value: formatCurrency(totalBalance), icon: Wallet, color: "text-green-600", bg: "bg-green-50" },
+    { title: "Active Accounts", value: activeAccounts.toString(), icon: PiggyBank, color: "text-purple-600", bg: "bg-purple-50" },
+    { title: "Average Balance", value: formatCurrency(averageBalance), icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50" },
   ];
 
   if (loading) {
@@ -152,30 +127,24 @@ export default function SavingsAccountsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Savings Accounts
-          </h1>
-          <p className="text-muted-foreground">
-            Manage member savings accounts and transactions.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Savings Accounts</h1>
+          <p className="text-muted-foreground">Manage member savings accounts and transactions.</p>
         </div>
-        <Button render={<Link href="/dashboard/savings/new" />}>
+        {canEdit && (
+          <Button render={<Link href="/dashboard/savings/new" />}>
             <Plus className="mr-2 h-4 w-4" />
             New Account
-        </Button>
+          </Button>
+        )}
       </div>
 
-      {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.title}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
               <div className={`rounded-md p-2 ${stat.bg}`}>
                 <stat.icon className={`h-4 w-4 ${stat.color}`} />
               </div>
@@ -187,20 +156,13 @@ export default function SavingsAccountsPage() {
         ))}
       </div>
 
-      {/* Search */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by account number or member name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Search by account number or member name..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -218,33 +180,29 @@ export default function SavingsAccountsPage() {
             <TableBody>
               {filteredAccounts.length === 0 ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    No savings accounts found.
-                  </TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No savings accounts found.</TableCell>
                 </TableRow>
               ) : (
                 filteredAccounts.map((account) => (
                   <TableRow key={account.id}>
-                    <TableCell className="font-medium">
-                      {account.account_number}
-                    </TableCell>
+                    <TableCell className="font-medium">{account.account_number}</TableCell>
                     <TableCell>{getMemberName(account.member_id)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(account.balance, account.currency)}
-                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(account.balance, account.currency)}</TableCell>
                     <TableCell>{account.currency}</TableCell>
-                    <TableCell className="text-right">
-                      {account.interest_rate}%
-                    </TableCell>
+                    <TableCell className="text-right">{account.interest_rate}%</TableCell>
                     <TableCell>{statusBadge(account.status)}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" render={<Link href={`/dashboard/savings/${account.id}`} />}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" render={<Link href={`/dashboard/savings/${account.id}`} />}>
                           <Eye className="mr-1 h-4 w-4" />
                           View
-                      </Button>
+                        </Button>
+                        {canDelete && (
+                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(account)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
