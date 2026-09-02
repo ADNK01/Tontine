@@ -51,8 +51,13 @@ cd C:\trading-bot
 ## 4. Installer les dépendances
 
 ```powershell
-npm install
+npm.cmd install
 ```
+
+> **Pourquoi `.cmd` ?** Par défaut, Windows interdit l'exécution des scripts
+> PowerShell, et `npm`/`npx` en sont. Écrire `npm.cmd` et `npx.cmd` contourne le
+> problème sans rien modifier sur votre machine. Si `npm install` fonctionne chez
+> vous, gardez-le, c'est équivalent.
 
 Une minute environ. Des avertissements jaunes sont normaux ; seules les lignes
 rouges `ERR!` posent problème.
@@ -62,7 +67,7 @@ rouges `ERR!` posent problème.
 ## 5. Lancer le backtest
 
 ```powershell
-npx tsx tools/backtest.ts BTCUSDT 1d 6
+npx.cmd tsx tools/backtest.ts BTCUSDT 1d 6
 ```
 
 Trois arguments : le **symbole**, l'**unité de temps**, le nombre d'**années**.
@@ -73,9 +78,9 @@ le balayage de paramètres, et le test contre des entrées aléatoires.
 Autres exemples :
 
 ```powershell
-npx tsx tools/backtest.ts ETHUSDT 1d 6
-npx tsx tools/backtest.ts BTCUSDT 4h 3
-npx tsx tools/backtest.ts SOLUSDT 1d 5
+npx.cmd tsx tools/backtest.ts ETHUSDT 1d 6
+npx.cmd tsx tools/backtest.ts BTCUSDT 4h 3
+npx.cmd tsx tools/backtest.ts SOLUSDT 1d 5
 ```
 
 ---
@@ -106,6 +111,22 @@ inférieur à `signaux`, l'historique est trop court.
 
 ## Si ça coince
 
+**`npm.ps1 cannot be loaded because running scripts is disabled on this system`**
+→ La protection par défaut de Windows. Trois solutions, de la plus simple à la plus
+définitive :
+
+1. **Ajouter `.cmd`** : `npm.cmd install`, `npx.cmd tsx ...`. Rien à modifier.
+2. **Utiliser l'invite de commandes** plutôt que PowerShell : tapez `cmd` puis
+   Entrée dans la même fenêtre, et les commandes sans `.cmd` fonctionnent.
+3. **Autoriser les scripts pour votre compte**, une fois pour toutes :
+   ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+   ```
+   Cela modifie un réglage de sécurité de Windows pour votre session utilisateur :
+   les scripts locaux deviennent exécutables, ceux téléchargés doivent être signés.
+   C'est le réglage recommandé par Microsoft pour les développeurs, mais si vous
+   préférez ne rien changer, la solution 1 suffit.
+
 **`npm n'est pas reconnu`** → Node.js n'est pas installé, ou PowerShell doit être
 rouvert.
 
@@ -114,7 +135,7 @@ ou votre pays. Essayez le miroir :
 
 ```powershell
 $env:KLINES_BASE_URL="https://data-api.binance.vision"
-npx tsx tools/backtest.ts BTCUSDT 1d 6
+npx.cmd tsx tools/backtest.ts BTCUSDT 1d 6
 ```
 
 **`signaux: 0`** → l'historique n'est pas assez long. Augmentez le nombre d'années,
