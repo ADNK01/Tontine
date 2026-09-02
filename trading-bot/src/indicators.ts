@@ -45,21 +45,43 @@ export function averagePressure(candles: Candle[], from: number, to: number): nu
   return n > 0 ? sum / n : 0.5;
 }
 
-/** Agrege des bougies M15 en bougies HTF (ex. 4 x M15 -> H1). Pas de lookahead. */
+/**
+ * Agrege des bougies en bougies d'unite superieure (ex. 4 x M15 -> H1).
+ *
+ * Le regroupement se fait sur l'HORLOGE, pas sur la position dans le tableau :
+ * une bougie H1 commence a une heure ronde, quelle que soit la bougie ou demarrent
+ * les donnees. Grouper par index decalerait les bornes H1 selon la fenetre chargee,
+ * et donnerait des pressions HTF differentes pour la meme bougie de signal.
+ *
+ * Seules les bougies HTF COMPLETES sont renvoyees : une H1 partielle en debut ou en
+ * fin de fenetre serait une fausse lecture.
+ */
 export function aggregate(candles: Candle[], factor: number): Candle[] {
-  const out: Candle[] = [];
-  for (let i = 0; i + factor <= candles.length; i += factor) {
-    const slice = candles.slice(i, i + factor);
-    const first = slice[0] as Candle;
-    const last = slice[slice.length - 1] as Candle;
-    out.push({
-      openTime: first.openTime,
-      open: first.open,
+  if (candles.length < 2 || factor < 2) return [];
+  // Pas de temps deduit des donnees elles-memes : le plus petit ecart observe.
+  let step = Infinity;
+  for (let i = 1; i < candles.length; i++) {
+    const d = (candles[i] as Candle).openTime - (candles[i - 1] as Candle).openTime;
+    if (d > 0 && d < step) step = d;
+  }
+  if (!Number.isFinite(step)) return [];
+  const bucketMs = step * factor;
+
+  const buckets = new Map<number, Candle[]>();
+  for (const c of candles) {
+    const key = Math.floor(c.openTime / bucketMs) * bucketMs;
+    buckets.set(key, [...(buckets.get(key) ?? []), c]);
+  }
+
+  return [...buckets.entries()]
+    .filter(([, slice]) => slice.length === factor)
+    .sort((a, b) => a[0] - b[0])
+    .map(([key, slice]) => ({
+      openTime: key,
+      open: (slice[0] as Candle).open,
       high: Math.max(...slice.map((c) => c.high)),
       low: Math.min(...slice.map((c) => c.low)),
-      close: last.close,
+      close: (slice[slice.length - 1] as Candle).close,
       volume: slice.reduce((s, c) => s + c.volume, 0),
-    });
-  }
-  return out;
+    }));
 }

@@ -3,6 +3,7 @@
 import { runScan } from './bot.js';
 import { runReplay } from './replay.js';
 import { runDiagnose } from './diagnose.js';
+import { runPropose } from './proposal.js';
 import { resetMemory } from './memory.js';
 import { log } from './logger.js';
 import { paths } from './config.js';
@@ -15,6 +16,7 @@ Usage : npm run <commande>
   replay:memory   Meme strategie filtree par la memoire, avec comparaison
   memory:reset    Vide data/ledger.csv et data/learnings.md
   diagnose        Montre a quel etage du filtre les bougies sont eliminees
+  propose         Produit un ticket d ordre complet — n envoie RIEN
 `;
 
 async function main(): Promise<void> {
@@ -28,6 +30,9 @@ async function main(): Promise<void> {
       break;
     case 'replay:memory':
       await runReplay('memory');
+      break;
+    case 'propose':
+      await runPropose();
       break;
     case 'diagnose':
       await runDiagnose();

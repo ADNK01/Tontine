@@ -29,6 +29,7 @@ Node 20+ requis.
 | `npm run replay:memory` | Meme fenetre, mais chaque setup est confronte a la memoire, avec comparaison chiffree |
 | `npm run memory:reset` | Vide `data/ledger.csv` et `data/learnings.md` |
 | `npm run diagnose` | Montre a quel etage du filtre les bougies sont eliminees |
+| `npm run propose` | Produit un ticket d'ordre complet — **n'envoie rien** |
 
 Ordre d'utilisation recommande :
 
@@ -77,19 +78,35 @@ La **pression** d'une bougie est `(cloture - plus bas) / (plus haut - plus bas)`
 
 ### Ce que ca donne sur donnees reelles
 
-Fenetre BTCUSD M15, 500 bougies reelles (28 aout -> 2 sept), sortie SL 1.8 ATR / TP 1R :
+Fenetre BTCUSD M15, 400 bougies reelles (29 aout -> 2 sept), bougies H1 alignees sur l'horloge :
 
 ```
-Bougies analysees : 475
-SIGNAUX RETENUS   : 1 achat, 1 vente
-    35  Range trop petit          98  Corps trop faible
-   293  Pression/contexte hors seuils
-    37  Balayage trop court       10  Filtre HTF contraire
+Bougies analysees : 375
+SIGNAUX RETENUS   : 0 achat, 0 vente
+    28  Range trop petit          75  Corps trop faible
+   233  Pression/contexte hors seuils
+    29  Balayage trop court       10  Filtre H1 contraire
 ```
 
-**2 signaux en 5 jours.** Les deux gagnants (+2.00 R au total), mais **deux trades ne
-prouvent rien** : c'est un echantillon sans aucune valeur statistique. Il faut des
-centaines de setups sur plusieurs regimes de marche avant de parler de performance.
+**Zero signal en quatre jours.** Comme l'indicateur, lui, dessine des fleches sur la
+meme periode, cela veut dire que **la reconstruction diverge de l'original**. Le
+coupable est identifie par test de sensibilite :
+
+| Configuration | Signaux sur 375 bougies |
+|---|---|
+| Tous les filtres (defaut) | **0** |
+| Sans le filtre H1 | 10 |
+| Sans le filtre de balayage | 4 |
+| Sans H1 ni balayage | 39 |
+| H1 assoupli a 0.5 | 0 |
+
+C'est **l'interpretation de `HTF_Min_Pressure` qui bloque tout**. Ma lecture — "la
+bougie H1 precedente doit clore a au moins 60% de son range dans le sens du trade" —
+est trop stricte pour etre celle de l'indicateur.
+
+**Calibrage necessaire** : relevez l'horodatage exact de 3 a 5 fleches sur votre
+graphique (date, heure, sens). Ces points suffisent a retrouver la vraie regle H1 :
+il suffit de garder l'interpretation qui reproduit vos fleches et rejette le reste.
 
 ## D'ou viennent les donnees
 
@@ -148,6 +165,30 @@ est *in-sample*. Pour un test propre : construisez la memoire sur une fenetre, p
 rejouez sur une autre (autre `SYMBOL`, autre `INTERVAL`, autre periode).
 
 
+## Mode proposition : du signal a l'ordre
+
+Ce bot **n'envoie jamais d'ordre**. Il ne detient aucune cle d'API et n'a aucun endpoint
+d'execution. `npm run propose` produit un **ticket** complet — sens, taille, entree, stop,
+objectifs, perte encourue en devise et en % du compte — l'archive dans
+`data/proposals.jsonl`, et s'arrete la. Un humain relit et decide.
+
+Le ticket refuse de lui-meme quand : aucun setup, capital insuffisant pour le stop, ou
+mise en garde de la memoire. Il signale aussi l'age des donnees — un ticket bati sur des
+bougies perimees ne vaut rien.
+
+```
+┌─ TICKET D ORDRE — PROPOSITION, RIEN N A ETE ENVOYE
+│ Statut        : REFUSE
+│ Marche        : BTCUSDT 15m
+│ Capital       : 19.60 USDT
+│ Donnees       : SNAPSHOT ARCHIVE — derniere bougie il y a 30 minutes
+│ Motif         : Pas de setup : pression 1.00, contexte 0.54 (seuils 0.72/0.4 et 0.28/0.6).
+└─ Aucun ordre envoye.
+```
+
+Un profil pret pour un compte futures crypto a tailles fractionnaires est fourni dans
+`.env.moonx.example` (aucune cle, uniquement des tailles et un solde a declarer).
+
 ## Le probleme du capital de 20 $
 
 C'est le point le plus important de ce document, et il ne depend d'aucune opinion :
@@ -166,7 +207,13 @@ Hypotheses : BTCUSD, taille de contrat 1 BTC par lot, lot minimum 0.01.
 Specification. Si votre broker utilise d'autres valeurs, changez `CONTRACT_SIZE` et
 `MIN_LOT` dans `.env`, tout le calcul suit.
 
-Conclusion : **au lot minimum, un seul stop coute 17 a 28 % de votre compte.**
+Cette table vaut pour **MT4 / FBS**, ou le lot minimum BTCUSD est 0.01 BTC.
+Sur un compte **futures crypto a tailles fractionnaires**, le calcul est bien plus
+favorable : une position de 0.001 BTC met en jeu 0.35 a 0.57 USDT sur ce meme stop, soit
+1.8 a 2.9 % d'un compte de 19.60 USDT — dimensionnable. Verifiez la taille d'ordre
+minimum de votre venue avant d'y compter.
+
+Conclusion pour MT4 : **au lot minimum, un seul stop coute 17 a 28 % de votre compte.**
 Trois pertes d'affilee — ce qui arrive avec n'importe quelle strategie — et il ne reste
 presque rien. Le bot refuse donc ces trades et l'ecrit noir sur blanc :
 
@@ -247,6 +294,7 @@ src/
   indicators.ts      ATR, pression, efficacite du corps, agregation HTF
   sizing.ts          taille de position depuis le capital reel
   diagnose.ts        funnel du filtre
+  proposal.ts        ticket d ordre — n envoie rien
   risk.ts            approuve / rejette, avec raison
   execution.ts       simulation papier + garde-fou TRADING_MODE
   memory.ts          lecture/ecriture ledger.csv et learnings.md
