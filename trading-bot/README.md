@@ -33,6 +33,10 @@ Node 20+ requis.
 | `npm run signals` | Liste tous les signaux, en UTC et en heure serveur MT4 |
 | `npm run calibrate -- <iso>` | Detaille l'evaluation a une bougie donnee |
 
+Reglages d'interpretation (les trois inconnues de la reconstruction) :
+`HTF_MODE` (aligned / contrarian / clear / off), `CONTEXT_DEPTH_MODE` (clarity / sweep),
+`READY_MODE` (cooldown / armed).
+
 Ordre d'utilisation recommande :
 
 ```bash
@@ -90,44 +94,58 @@ l'entier est un timestamp Unix.
 | Timestamp de la fleche | 1788221100 = **31/08/2026 21:05 UTC** |
 | Affichage MT4 | 01/09 00:05 -> **le serveur FBS tourne en UTC+3** |
 | Bougie (barre d'etat MT4) | O 78789.70 H 78860.20 L 78692.10 C 78860.20 |
-| Unite de temps | **M5** (pas M15) |
+| Unite de temps | **M5** |
 
-Ce que cette bougie dit de la reconstruction, valeur par valeur :
+**Ce qui est confirme** — les valeurs calculees reproduisent le tableau de bord de
+l'indicateur (`Live Pressure: Current / Context`, `HTF - last closed bar: Pressure (min 60%)`) :
 
-| Etage | Valeur mesuree | Seuil | Verdict |
+| Etage | Mesure | Seuil | Verdict |
 |---|---|---|---|
-| Pression de la bougie | **100 %** (cloture = plus haut) | achat >= 72 % | passe |
-| Contexte sur 8 bougies | **34 %** | achat <= 40 % | passe |
+| Pression de la bougie | 100 % | achat >= 72 % | passe |
+| Contexte sur 8 bougies | 34 % | achat <= 40 % | passe |
 | Efficacite du corps | 0.40 | >= 0.25 | passe |
-| Pression H1 (derniere close) | **21 %** — donc baissiere | mon ancienne regle : >= 60 % | **contredit** |
+| Seuil HTF | 60 % confirme par le panneau | | |
+| Bougie HTF | "last closed bar" confirme | | |
 
-**Les definitions de pression et de contexte sont donc justes** — elles reproduisent les
-valeurs du tableau de bord de l'indicateur (`Live Pressure: Current / Context`,
-`HTF - last closed bar: Pressure ... (min 60%)`). En revanche, l'indicateur a dessine un
-**achat alors que la H1 etait baissiere a 21 %**. La regle "la H1 doit pousser dans le
-sens du trade" est donc fausse.
+**Ce qui a ete corrige grace aux fleches** :
 
-`HTF_MODE` rend l'hypothese configurable :
+1. `HTF_Min_Pressure` — l'indicateur a signale un **achat avec une H1 a 21 %**, donc
+   baissiere. Le mode `aligned` est elimine. `HTF_MODE` = `contrarian` (defaut), `clear`
+   ou `off` restent possibles.
+2. `Min_Context_Depth` — la section de l'indicateur s'appelle **CONTEXT CLARITY**.
+   Ce n'est pas une profondeur de balayage mais la **nettete du contexte**, sa distance
+   au neutre : `|contexte - 0.5| >= 0.05`. Avec l'ancienne lecture, tous les setups aux
+   extremes reels etaient rejetes. `CONTEXT_DEPTH_MODE` = `clarity` (defaut) ou `sweep`.
+3. `Filter_Ready_Window` = 5 (`Ready Window: 5 bars` au panneau) — sans lui un meme
+   retournement produit une grappe de signaux consecutifs alors que l'indicateur ne
+   dessine qu'une fleche. `READY_MODE` = `cooldown` (defaut) ou `armed`.
 
-| Mode | Regle | Signaux sur 498 bougies M5 | Compatible avec la fleche connue |
-|---|---|---|---|
-| `aligned` | la H1 pousse dans le sens du trade | 2 | **non — exclu** |
-| `contrarian` | on fade l'exces H1 (defaut) | 8 | oui |
-| `clear` | la H1 a une direction nette, peu importe laquelle | 10 | oui |
-| `off` | filtre desactive | 12 | oui |
+### Ce qui ne colle pas encore : la densite de signaux
 
-Une seule fleche ne peut pas departager les trois derniers modes. **`npm run signals`**
-sort la liste des signaux en heure serveur MT4, prete a comparer avec vos fleches :
+Sur une fenetre d'environ 32 heures, le graphique MT4 montre **3 fleches**. La
+reconstruction en produit beaucoup plus :
 
-```
-SENS  UTC               SERVEUR MT4 (UTC+3)  PRIX      SL        TP1
-BUY   2026-09-01 01:30  2026-09-01 04:30     78477.67  78272.26  78683.08
-SELL  2026-09-01 03:05  2026-09-01 06:05     78449.46  78607.31  78291.61
-...
-```
+| `READY_MODE` | `HTF_MODE` | Signaux sur 41 h |
+|---|---|---|
+| cooldown | contrarian | 20 |
+| cooldown | clear | 31 |
+| cooldown | off | 38 |
+| armed | contrarian | 26 |
+| armed | clear | 36 |
+| armed | off | 45 |
 
-Regardez si des fleches existent a ces heures sur votre graphique. Celles qui manquent,
-et celles que le bot rate, designent le mode a retenir.
+Meme la combinaison la plus stricte signale environ **5 fois trop**. Un etage
+supplementaire de l'indicateur n'est donc pas reproduit — continuer a deviner serait
+inefficace.
+
+**Ce qui trancherait tout de suite** : les horodatages exacts de quelques fleches.
+Survolez une fleche dans MT4, l'infobulle donne un nom d'objet du type
+`ECS_Line_1788221100_TP3` dont l'entier est un timestamp Unix. Trois ou quatre suffisent :
+il devient alors possible de garder l'interpretation qui reproduit ces bougies-la et
+rejette les autres, au lieu d'en tester une a l'aveugle.
+
+`npm run signals` sort la liste en heure serveur MT4, `npm run calibrate -- <iso>` detaille
+une bougie precise, etage par etage.
 
 ## Mode proposition : du signal a l'ordre
 

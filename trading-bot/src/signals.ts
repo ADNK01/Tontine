@@ -9,22 +9,20 @@
 import { config } from './config.js';
 import { log } from './logger.js';
 import { getCandles, closedCandles } from './market.js';
-import { evaluateAt } from './strategy.js';
+import { collectSignals } from './sequence.js';
 import { resolveHtf } from './replay.js';
 
 const fmt = (t: number): string => new Date(t).toISOString().slice(0, 16).replace('T', ' ');
 
 export async function runSignals(): Promise<void> {
-  log.title(`SIGNAUX — ${config.symbol} ${config.interval} — filtre HTF en mode "${config.enigma.htfMode}"`);
+  log.title(`SIGNAUX — ${config.symbol} ${config.interval} — HTF "${config.enigma.htfMode}", contexte "${config.enigma.contextDepthMode}", ready window ${config.enigma.filterReadyWindow}`);
   const set = await getCandles();
   const candles = closedCandles(set.candles);
   const htf = await resolveHtf(candles);
   const off = config.serverUtcOffsetHours;
 
   const rows: string[][] = [];
-  for (let i = 30; i < candles.length; i++) {
-    const s = evaluateAt(candles, i, { htf });
-    if (!s || s.action === 'HOLD') continue;
+  for (const { signal: s } of collectSignals(candles, htf, 30, candles.length - 1)) {
     rows.push([s.action, fmt(s.time), fmt(s.time + off * 3600_000), s.price.toFixed(2),
       s.sl?.toFixed(2) ?? '-', s.tp1?.toFixed(2) ?? '-']);
   }

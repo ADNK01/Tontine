@@ -67,8 +67,10 @@ export async function runCalibrate(isoTime: string): Promise<void> {
   console.log('--- Autres etages ---');
   console.log(`  Range / ATR         : ${a ? (range / a).toFixed(2) : 'n/a'}     (min ${e.minRangeAtr})`);
   console.log(`  Efficacite du corps : ${bodyEfficiency(bar).toFixed(2)}     (min ${e.minBodyEfficiency})`);
-  console.log(`  Balayage bas        : ${a ? ((ctxLow - bar.low) / a).toFixed(3) : 'n/a'} x ATR  (min ${e.minContextDepth})`);
-  console.log(`  Balayage haut       : ${a ? ((bar.high - ctxHigh) / a).toFixed(3) : 'n/a'} x ATR  (min ${e.minContextDepth})`);
+  console.log(`  Mode context depth  : ${e.contextDepthMode}`);
+  console.log(`  Nettete du contexte : ${Math.abs(ctxPressure - 0.5).toFixed(3)}          (min ${e.minContextDepth} en mode clarity)`);
+  console.log(`  Balayage bas        : ${a ? ((ctxLow - bar.low) / a).toFixed(3) : 'n/a'} x ATR  (min ${e.minContextDepth} en mode sweep)`);
+  console.log(`  Balayage haut       : ${a ? ((bar.high - ctxHigh) / a).toFixed(3) : 'n/a'} x ATR`);
   log.blank();
 
   const signal = evaluateAt(candles, i, { htf: e.useHtf ? htf : undefined });

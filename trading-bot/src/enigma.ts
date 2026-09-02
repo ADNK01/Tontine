@@ -81,9 +81,9 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
 
   // --- Setup haussier : contexte vendeur, balayage du bas, cloture haute ---
   if (p >= e.bullReversalMin && ctxPressure <= e.bearContextMax) {
-    const depth = (ctxLow - bar.low) / a;
+    const depth = contextDepth(ctxPressure, ctxLow - bar.low, a);
     if (e.useContextDepth && depth < e.minContextDepth) {
-      return neutral(`Setup haussier rejete : profondeur de balayage ${depth.toFixed(3)} x ATR < ${e.minContextDepth}.`);
+      return neutral(`Setup haussier rejete : ${depthLabel()} ${depth.toFixed(3)} < ${e.minContextDepth}.`);
     }
     const htf = htfPressureAt(ctx.htf, bar.openTime);
     const htfVerdict = checkHtf(htf, 'BUY');
@@ -101,7 +101,7 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
       setupKey: `${config.symbol}|ENIGMA|BULL_REVERSAL`,
       reason:
         `Retournement haussier : contexte vendeur (pression moyenne ${ctxPressure.toFixed(2)} sur ${e.momentumBars} bougies), ` +
-        `balayage du bas de ${((ctxLow - bar.low) / a).toFixed(2)} x ATR, cloture a ${(p * 100).toFixed(0)}% du range, ` +
+        `${depthLabel()} ${depth.toFixed(2)}, cloture a ${(p * 100).toFixed(0)}% du range, ` +
         `corps ${(bodyEff * 100).toFixed(0)}%${e.useHtf && htf ? `, pression H1 ${htf.pressure.toFixed(2)}` : ''}.`,
       atr: a, sl, tp1: bar.close + e.tp1RR * risk, tp2: bar.close + e.tp2RR * risk, tp3: bar.close + e.tp3RR * risk,
     };
@@ -109,9 +109,9 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
 
   // --- Setup baissier : contexte acheteur, balayage du haut, cloture basse ---
   if (p <= e.bearReversalMax && ctxPressure >= e.bullContextMin) {
-    const depth = (bar.high - ctxHigh) / a;
+    const depth = contextDepth(ctxPressure, bar.high - ctxHigh, a);
     if (e.useContextDepth && depth < e.minContextDepth) {
-      return neutral(`Setup baissier rejete : profondeur de balayage ${depth.toFixed(3)} x ATR < ${e.minContextDepth}.`);
+      return neutral(`Setup baissier rejete : ${depthLabel()} ${depth.toFixed(3)} < ${e.minContextDepth}.`);
     }
     const htf = htfPressureAt(ctx.htf, bar.openTime);
     const htfVerdict = checkHtf(htf, 'SELL');
@@ -129,7 +129,7 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
       setupKey: `${config.symbol}|ENIGMA|BEAR_REVERSAL`,
       reason:
         `Retournement baissier : contexte acheteur (pression moyenne ${ctxPressure.toFixed(2)} sur ${e.momentumBars} bougies), ` +
-        `balayage du haut de ${((bar.high - ctxHigh) / a).toFixed(2)} x ATR, cloture a ${(p * 100).toFixed(0)}% du range, ` +
+        `${depthLabel()} ${depth.toFixed(2)}, cloture a ${(p * 100).toFixed(0)}% du range, ` +
         `corps ${(bodyEff * 100).toFixed(0)}%${e.useHtf && htf ? `, pression H1 ${htf.pressure.toFixed(2)}` : ''}.`,
       atr: a, sl, tp1: bar.close - e.tp1RR * risk, tp2: bar.close - e.tp2RR * risk, tp3: bar.close - e.tp3RR * risk,
     };
@@ -140,6 +140,20 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
       `(seuils achat ${e.bullReversalMin}/${e.bearContextMax}, vente ${e.bearReversalMax}/${e.bullContextMin}).`,
   );
 }
+
+/**
+ * Mesure de "Min_Context_Depth", selon l'interpretation retenue.
+ *  clarity : a quel point le contexte est tranche (distance au neutre 0.5)
+ *  sweep   : de combien la bougie de signal depasse l'extreme du contexte, en ATR
+ */
+export function contextDepth(ctxPressure: number, sweepDistance: number, atrValue: number): number {
+  return config.enigma.contextDepthMode === 'clarity'
+    ? Math.abs(ctxPressure - 0.5)
+    : sweepDistance / atrValue;
+}
+
+const depthLabel = (): string =>
+  config.enigma.contextDepthMode === 'clarity' ? 'nettete du contexte' : 'profondeur de balayage (x ATR)';
 
 /**
  * Filtre HTF. Renvoie null si le setup passe, sinon le motif de rejet.

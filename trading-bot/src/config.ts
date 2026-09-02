@@ -45,7 +45,29 @@ export const config = {
     minRangeAtr: num(process.env.MIN_RANGE_ATR, 0.5),
     requireConfirmation: bool(process.env.REQUIRE_CONFIRMATION, false),
     confirmationBars: num(process.env.CONFIRMATION_BARS, 1),
+    /**
+     * "Filter_Ready_Window" / "Ready Window: 5 bars" du tableau de bord :
+     * nombre de bougies pendant lesquelles aucun nouveau signal n'est emis apres
+     * un signal. Sans lui, un meme retournement declenche une grappe de signaux
+     * consecutifs alors que l'indicateur ne dessine qu'une fleche.
+     */
+    filterReadyWindow: num(process.env.FILTER_READY_WINDOW, 5),
+    /**
+     * Lecture de "Filter_Ready_Window" :
+     *  cooldown : delai de recharge apres un signal (une fleche par retournement)
+     *  armed    : le signal n'est admis que dans les N bougies suivant la cloture
+     *             d'une bougie HTF ("FILTER-FIRST ARCHITECTURE")
+     */
+    readyMode: (process.env.READY_MODE ?? 'cooldown') as 'cooldown' | 'armed',
     useContextDepth: bool(process.env.USE_CONTEXT_DEPTH, true),
+    /**
+     * Interpretation de Min_Context_Depth. La section de l'indicateur s'appelle
+     * "CONTEXT CLARITY", ce qui plaide pour "clarity" : le contexte doit etre
+     * assez tranche, c'est-a-dire assez loin du neutre (0.5).
+     *  clarity : |pression du contexte - 0.5| >= seuil
+     *  sweep   : la bougie de signal casse l'extreme du contexte de seuil x ATR
+     */
+    contextDepthMode: (process.env.CONTEXT_DEPTH_MODE ?? 'clarity') as 'clarity' | 'sweep',
     minContextDepth: num(process.env.MIN_CONTEXT_DEPTH, 0.05),
     useHtf: bool(process.env.USE_HTF, true),
     /** Nombre de bougies de l'unite courante formant une bougie HTF (M15 -> H1 = 4). */

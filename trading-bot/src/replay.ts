@@ -14,7 +14,7 @@
 import { config } from './config.js';
 import { log } from './logger.js';
 import { getCandles, getHtfCandles, closedCandles } from './market.js';
-import { evaluateAt } from './strategy.js';
+import { collectSignals } from './sequence.js';
 import { checkRisk } from './risk.js';
 import { aggregate } from './indicators.js';
 import { appendLearning, appendLedgerRow, readLedger, readLearnings } from './memory.js';
@@ -175,9 +175,7 @@ export async function runReplay(mode: 'raw' | 'memory'): Promise<ReplaySummary> 
   let rejectedBySizing = 0;
   let lastSizingReason = '';
 
-  for (let i = warmup; i < candles.length - 1; i++) {
-    const signal = evaluateAt(candles, i, { htf });
-    if (!signal || signal.action === 'HOLD') continue;
+  for (const { index: i, signal } of collectSignals(candles, htf, warmup, candles.length - 2)) {
     totalSetups++;
 
     const exitInfo = simulateExit(candles, i, signal);
