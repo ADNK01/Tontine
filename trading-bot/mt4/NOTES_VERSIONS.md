@@ -79,3 +79,100 @@ Si l'objectif est que le moteur de divergence serve à quelque chose :
 Ces chiffres viennent de la transcription TypeScript (`src/wyckoff.ts`), pas de
 l'indicateur lui-même. Ils décrivent la logique du code source. Pour mesurer
 l'indicateur réel, utiliser `mt4/EnigmaTester.mq4` dans le Strategy Tester.
+
+---
+
+# Test du réglage absent des trois versions
+
+`RSI_Swing_Bars` bas, **sans** `Use_ER_Quality` **ni** `Use_CUSUM` — la combinaison
+qu'aucune des trois versions livrées ne propose.
+
+Sortie simulée bougie par bougie : stop ou objectif, stop prioritaire si les deux
+sont touchés dans la même bougie, durée de vie maximale 50 bougies. Objectif TP1
+(1R) sauf mention contraire. Outil : `tools/sweep.ts`.
+
+## 1. Le moteur de divergence se réveille
+
+C'était l'objectif du test, et il est atteint.
+
+| `RSI_Swing_Bars` | Signaux par vraie divergence (BTC journalier) |
+|---|---|
+| 50 (V3/V5) | 2 |
+| 20 | 6 |
+| 12 | 5 |
+| 8 | 5 |
+| 5 | 6 |
+| 3 | 4 |
+
+Abaisser le paramètre multiplie les pivots disponibles, donc les paires
+appariables. La couche de divergence cesse d'être décorative.
+
+## 2. Des ventes apparaissent — mais seulement en journalier
+
+| Échelle | Ventes produites |
+|---|---|
+| Journalier | 2 à 3 sur 7 à 9 signaux |
+| H1 | 0 à 1 |
+| M5 | **0, à tous les réglages** |
+
+Le biais acheteur se réduit sans disparaître, et il reste total en M5.
+
+## 3. Le résultat se sépare nettement par échelle de temps
+
+BTCUSDT, toutes valeurs de `RSI_Swing_Bars` testées :
+
+| Échelle | Total R (min → max) |
+|---|---|
+| Journalier | **+1.50 → +4.40** (positif partout) |
+| H1 | −0.85 → +1.53 (autour de zéro) |
+| M5 | **−2.00 → −4.63** (négatif partout) |
+
+Ce n'est pas une cellule isolée : le signe est constant sur les six réglages de
+chaque échelle. C'est l'observation la plus solide de tout ce test.
+
+## 4. Contrôles de robustesse
+
+**Second actif.** ETHUSDT journalier, mêmes réglages : positif partout également
+(+2.83 à +3.83 R). Le résultat journalier n'est donc pas propre à BTC.
+
+**Direction du marché.** Sur la période (21 avril 2025 → 2 septembre 2026) :
+- BTC **−11.7 %** (87 516 → 77 304)
+- ETH **+51.5 %** (1 580 → 2 394)
+
+Une stratégie quasi exclusivement acheteuse qui gagne sur BTC pendant que BTC perd
+11.7 % n'est pas expliquée par la tendance. Le résultat ETH, lui, est confondu avec
+un marché en hausse de 51 % : il ne prouve rien à lui seul.
+
+**Objectif de sortie.** `RSI_Swing_Bars = 8`, cibles 1R / 2R / 3R :
+positif dans les six cas, et croissant avec la cible. L'avantage ne tient donc pas
+à une valeur d'objectif particulière.
+
+## 5. Pourquoi il ne faut rien conclure
+
+| Actif | Cible | Signaux | Trades réellement clôturés |
+|---|---|---|---|
+| BTC | 1R | 7 | **4** |
+| BTC | 2R | 7 | **1** |
+| BTC | 3R | 7 | **0** |
+| ETH | 1R | 8 | 5 |
+| ETH | 3R | 8 | 3 |
+
+Le « 100 % de réussite » de BTC à 1R repose sur **quatre trades**. À 3R, aucun
+trade ne se clôture en 50 bougies : le +4.96 R affiché n'est que la valorisation de
+positions encore ouvertes, pas un résultat.
+
+Par ailleurs, ces chiffres sortent d'un **balayage de paramètres sur un jeu de
+données unique**. Choisir `RSI_Swing_Bars = 8` parce que c'est la meilleure cellule
+du tableau, c'est du sur-ajustement, pas une découverte. La valeur de ce test tient
+aux **régularités de signe** (journalier positif, M5 négatif, sur tous les
+réglages), pas au classement des cellules.
+
+## 6. Ce qui en ressort d'utilisable
+
+1. **Cette stratégie n'est pas faite pour le M5.** Négative à tous les réglages, et
+   sans une seule vente. C'est l'échelle du graphique actuel — c'est donc le point
+   le plus actionnable de tout ce document.
+2. **Le journalier mérite un vrai test**, sur plusieurs années et plusieurs actifs,
+   avec frais et spread. Pas sur 500 bougies.
+3. **Désactiver ER et CUSUM et baisser `RSI_Swing_Bars`** est ce qui rend le moteur
+   de divergence fonctionnel. Aucune des trois versions livrées ne le fait.
