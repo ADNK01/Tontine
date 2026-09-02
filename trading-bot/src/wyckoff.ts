@@ -155,6 +155,83 @@ export function wyckoffSignals(candles: Candle[]): WyckoffSignal[] {
     return rsi(pivIdx) - rsi(pivIdx + 5);
   };
 
+  // ── Qualite du pivot (CheckPivotReversal) ────────────────────────────────
+  /**
+   * Le pivot a-t-il reellement produit un retournement ? Transcrit du source.
+   * Cinq sous-filtres, tous desactivables ; la V5 n'active que CUSUM, la V4
+   * active CUSUM et l'efficacite de Kaufman.
+   *
+   * Note : la source borne `minBar` par une variable `g_evalBar` qui vaut -1 en
+   * permanence — la borne est donc inoperante. Non transcrite, exprès.
+   */
+  const rogSatchVol = (startBar: number, len: number): number => {
+    let sum = 0, cnt = 0;
+    for (let i = startBar; i < startBar + len && i < bars; i++) {
+      const h = s.high(i), l = s.low(i), o = s.open(i), c = s.close(i);
+      if (h <= 0 || l <= 0 || o <= 0 || c <= 0 || h === l) continue;
+      sum += Math.log(h / c) * Math.log(h / o) + Math.log(l / c) * Math.log(l / o);
+      cnt++;
+    }
+    if (cnt < 2) return 0;
+    const v = sum / cnt;
+    return v > 0 ? Math.sqrt(v) : 0;
+  };
+
+  const kaufmanEr = (pivIdx: number, endBar: number, sig: number): number => {
+    if (pivIdx <= endBar) return 0;
+    const pivPrice = sig === 1 ? s.low(pivIdx) : s.high(pivIdx);
+    const curPrice = sig === 1 ? s.high(endBar) : s.low(endBar);
+    const direction = Math.abs(curPrice - pivPrice);
+    let path = 0;
+    for (let i = pivIdx - 1; i >= endBar; i--) path += Math.abs(s.close(i) - s.close(i + 1));
+    return path > 0 ? direction / path : 0;
+  };
+
+  const checkPivotReversal = (pivIdx: number, sig: number): boolean => {
+    if (!w.useAtrReversal && !w.useRsReversal && !w.useErQuality && !w.useCusum && !w.useZScore) return true;
+
+    let minBar = pivIdx - w.reversalBars;
+    if (minBar < 1) minBar = 1;
+    if (pivIdx - 1 < minBar) return false;
+
+    let atrOk = !w.useAtrReversal;
+    let rsOk = !w.useRsReversal;
+    let erOk = !w.useErQuality;
+    let cusumOk = !w.useCusum;
+    let zOk = !w.useZScore;
+
+    const pivPrice = sig === 1 ? s.low(pivIdx) : s.high(pivIdx);
+    const atrAtPiv = mtAtr(s, w.atrPeriod, pivIdx);
+    let cusum = 0;
+
+    for (let b = pivIdx - 1; b >= minBar; b--) {
+      const disp = sig === 1 ? s.high(b) - pivPrice : pivPrice - s.low(b);
+      if (!atrOk && atrAtPiv > 0 && disp >= atrAtPiv * w.atrReversalMulti) atrOk = true;
+      if (!rsOk) {
+        const rsVol = rogSatchVol(b, w.rsPeriod);
+        if (rsVol > 0) {
+          const avgPrice = (s.high(pivIdx) + s.low(pivIdx)) / 2;
+          if (disp >= avgPrice * rsVol * w.rsReversalMulti) rsOk = true;
+        }
+      }
+      if (!cusumOk && atrAtPiv > 0) {
+        const inc = sig === 1 ? s.close(b) - s.close(b + 1) : s.close(b + 1) - s.close(b);
+        cusum += inc / atrAtPiv;
+        if (cusum < 0) cusum = 0;
+        if (cusum >= w.cusumThreshold) cusumOk = true;
+      }
+      if (!zOk && atrAtPiv > 0) {
+        const n = pivIdx - b;
+        if (n >= 1 && disp / (atrAtPiv * Math.sqrt(n)) >= w.zscoreThreshold) zOk = true;
+      }
+      if (atrOk && rsOk && cusumOk && zOk) break;
+    }
+
+    if (!atrOk || !rsOk || !cusumOk || !zOk) return false;
+    if (w.useErQuality && kaufmanEr(pivIdx, minBar, sig) >= w.erMinQuality) erOk = true;
+    return erOk;
+  };
+
   // ── Divergence (CheckDivergence) ─────────────────────────────────────────
   /**
    * Renvoie la raison si la divergence est confirmee, null sinon.
@@ -180,9 +257,11 @@ export function wyckoffSignals(candles: Candle[]): WyckoffSignal[] {
     for (let p1 = bar; p1 <= maxPiv - w.divMinGap; p1++) {
       if (p1 >= cacheBars) break;
       if ((piv[p1] ?? 0) <= 0) continue;
+      if (!checkPivotReversal(p1, sig)) continue;
       for (let p2 = p1 + w.divMinGap; p2 <= maxPiv; p2++) {
         if (p2 >= cacheBars) break;
         if ((piv[p2] ?? 0) <= 0) continue;
+        if (!checkPivotReversal(p2, sig)) continue;
 
         const price1 = sig === 1 ? s.low(p1) : s.high(p1);
         const price2 = sig === 1 ? s.low(p2) : s.high(p2);

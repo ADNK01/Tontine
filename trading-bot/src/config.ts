@@ -12,6 +12,20 @@ const num = (v: string | undefined, d: number): number => {
 const bool = (v: string | undefined, d: boolean): boolean =>
   v === undefined || v === '' ? d : ['1', 'true', 'yes', 'oui'].includes(v.toLowerCase());
 
+/**
+ * Prereglages des versions de l'indicateur. V3, V4 et V5 partagent EXACTEMENT le
+ * meme algorithme : la comparaison des trois fichiers source ne montre aucune
+ * difference de logique, uniquement ces valeurs par defaut et le numero de version.
+ */
+const WYCKOFF_PRESETS = {
+  v3: { divLookback: 100, reversalBars: 15, useErQuality: false, erMinQuality: 0.2, useCusum: false, scanWindow: 150,  rsiSwingBars: 50 },
+  v4: { divLookback: 50,  reversalBars: 50, useErQuality: true,  erMinQuality: 0.3, useCusum: true,  scanWindow: 5000, rsiSwingBars: 5  },
+  v5: { divLookback: 100, reversalBars: 50, useErQuality: false, erMinQuality: 0.3, useCusum: true,  scanWindow: 5000, rsiSwingBars: 50 },
+} as const;
+
+const wyckoffVersion = (process.env.WYCKOFF_VERSION ?? 'v5') as keyof typeof WYCKOFF_PRESETS;
+const preset = WYCKOFF_PRESETS[wyckoffVersion] ?? WYCKOFF_PRESETS.v5;
+
 export const config = {
   // --- Marche ---
   symbol: process.env.SYMBOL ?? 'BTCUSDT',
@@ -128,10 +142,24 @@ export const config = {
     divRsiPeriod: num(process.env.W_DIV_RSI_PERIOD, 7),
     minOscDiff: num(process.env.W_MIN_OSC_DIFF, 2.0),
     // Recherche de pivots
-    divLookback: num(process.env.W_DIV_LOOKBACK, 100),
+    version: wyckoffVersion,
+    divLookback: num(process.env.W_DIV_LOOKBACK, preset.divLookback),
     divMinGap: num(process.env.W_DIV_MIN_GAP, 5),
     priceMinDiffAtr: num(process.env.W_PRICE_MIN_DIFF_ATR, 1.0),
-    rsiSwingBars: num(process.env.W_RSI_SWING_BARS, 50),
+    rsiSwingBars: num(process.env.W_RSI_SWING_BARS, preset.rsiSwingBars),
+    // Filtres de qualite du pivot (CheckPivotReversal)
+    reversalBars: num(process.env.W_REVERSAL_BARS, preset.reversalBars),
+    useAtrReversal: bool(process.env.W_USE_ATR_REVERSAL, false),
+    atrReversalMulti: num(process.env.W_ATR_REVERSAL_MULTI, 1.0),
+    useRsReversal: bool(process.env.W_USE_RS_REVERSAL, false),
+    rsReversalMulti: num(process.env.W_RS_REVERSAL_MULTI, 1.0),
+    rsPeriod: num(process.env.W_RS_PERIOD, 14),
+    useErQuality: bool(process.env.W_USE_ER_QUALITY, preset.useErQuality),
+    erMinQuality: num(process.env.W_ER_MIN_QUALITY, preset.erMinQuality),
+    useCusum: bool(process.env.W_USE_CUSUM, preset.useCusum),
+    cusumThreshold: num(process.env.W_CUSUM_THRESHOLD, 3.0),
+    useZScore: bool(process.env.W_USE_ZSCORE, false),
+    zscoreThreshold: num(process.env.W_ZSCORE_THRESHOLD, 2.0),
     // Sorties
     slAtrMulti: num(process.env.W_SL_ATR_MULTI, 3.0),
     tp1RR: num(process.env.W_TP1_RR, 1.0),
@@ -140,7 +168,7 @@ export const config = {
     targetRR: num(process.env.W_TARGET_RR, 1),
     // Espacement
     minBarsBetween: num(process.env.W_MIN_BARS_BETWEEN, 5),
-    scanWindow: num(process.env.W_SCAN_WINDOW, 150),
+    scanWindow: num(process.env.W_SCAN_WINDOW, preset.scanWindow),
     ratioLen: num(process.env.W_RATIO_LEN, 15),
     /** Taille d'un point du symbole : 0.01 pour un BTCUSD a 2 decimales. */
     point: num(process.env.W_POINT, 0.01),

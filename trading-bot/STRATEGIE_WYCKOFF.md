@@ -311,21 +311,30 @@ pour bar de la plus ancienne bougie exploitable jusqu'à 1 :
 
 ## 13. Vérification sur données réelles
 
-Transcription exécutée sur 498 bougies M5 réelles de BTCUSD
-(31 août → 2 septembre 2026, ~41 h) :
+Transcription exécutée sur des bougies BTCUSDT réelles. « Vraie divergence » =
+le moteur a validé une paire de pivots ; « branche permissive » = §10, piège n°1.
 
-```
-2 signaux, tous deux en ACHAT
-BUY  2026-09-01 00:45 UTC  entrée 78807.99  SL 78497.14  TP1 79118.84
-BUY  2026-09-01 06:30 UTC  entrée 78934.31  SL 78590.65  TP1 79277.97
-```
+| Données | Signaux | dont vraie divergence | Sens |
+|---|---|---|---|
+| 500 jours (avril 2025 → sept. 2026) | 3 à 5 selon la version | 0 à 2 | **100 % achats** |
+| 500 heures (20 jours) | 1 à 2 | 0 | **100 % achats** |
+| 500 bougies M5 (41 h) | 2 | 0 | **100 % achats** |
 
-Les deux en achat : c'est exactement le piège n°1 à l'œuvre — la fenêtre de
-41 heures est trop courte pour la couche de divergence, qui laisse alors passer.
-**Deux signaux ne démontrent rien.** Pour juger la stratégie il faut plusieurs
-mois de données et plusieurs régimes de marché.
+**Aucune vente n'a jamais été produite**, sur aucune échelle, aucune version,
+17 mois de données. C'est une conséquence directe du piège n°1 : la branche
+permissive teste le sens haussier en premier et le retient.
 
----
+**Le moteur de divergence ne se déclenche presque jamais.** Avec
+`RSI_Swing_Bars = 50`, un pivot doit être l'extrême de 101 bougies : on en compte
+3 creux et 4 sommets sur 500 bougies journalières. Apparier deux de ces pivots dans
+une fenêtre de 100 bougies est arithmétiquement quasi impossible. Sur 17 mois, la
+divergence a validé **2 signaux** — et uniquement dans la configuration V3.
+
+Conclusion opérationnelle : telle qu'elle est livrée, cette stratégie se comporte
+comme un **détecteur d'épuisement uniquement à l'achat**, et non comme le moteur de
+divergence annoncé. À implémenter en le sachant.
+
+Le détail par version est dans `mt4/NOTES_VERSIONS.md`.
 
 ## 14. Gestion du risque — indépendante de la stratégie
 

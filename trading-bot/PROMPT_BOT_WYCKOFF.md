@@ -159,6 +159,15 @@ reproduis ce comportement, signale-le à chaque fois qu'il s'applique — un sig
 obtenu par cette voie n'est pas un vrai signal de divergence. Si tu ne le reproduis
 pas, dis-le aussi : tu ne fais alors plus tout à fait la même stratégie.
 
+**Ce que cela donne en pratique — mesuré, pas supposé.** Sur 17 mois de données
+journalières réelles, 20 jours en H1 et 41 heures en M5, cette stratégie n'a produit
+**que des achats, jamais une seule vente**, et la quasi-totalité des signaux venait
+de la branche permissive et non du moteur de divergence. Avec `RSI_Swing_Bars = 50`,
+il n'existe que 3 à 4 pivots pour 500 bougies : en apparier deux est presque
+impossible. Traite donc cette stratégie pour ce qu'elle est réellement — un
+détecteur d'épuisement à l'achat — et non pour ce que son nom annonce. Si tu
+observes le même déséquilibre, ce n'est pas un bug de ton implémentation.
+
 **Volume.** Sur MetaTrader, `Volume` est un volume de **ticks**, pas un volume
 échangé. Les mesures d'énergie et de delta en dépendent directement. Sur des données
 à volume réel, tes chiffres différeront de ceux de la plateforme. Ce n'est pas une
