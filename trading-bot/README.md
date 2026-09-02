@@ -120,32 +120,48 @@ l'indicateur (`Live Pressure: Current / Context`, `HTF - last closed bar: Pressu
    retournement produit une grappe de signaux consecutifs alors que l'indicateur ne
    dessine qu'une fleche. `READY_MODE` = `cooldown` (defaut) ou `armed`.
 
-### Ce qui ne colle pas encore : la densite de signaux
+### Le code source d'un indicateur frere a leve trois inconnues
 
-Sur une fenetre d'environ 32 heures, le graphique MT4 montre **3 fleches**. La
-reconstruction en produit beaucoup plus :
+Le fichier `Enigma_Wyckoff_Pro_V3.mq4` s'est revele etre `Sdv_Wyckoff` / "SDC Exhaust
+3.03" — **un autre indicateur du meme auteur**, pas "Enigma Cipher S v1.01". Sa liste
+de parametres ne correspond pas a la boite de dialogue des captures. Mais
+l'architecture est partagee, et sa lecture remplace trois hypotheses par des faits.
+Le detail est dans `mt4/NOTES_SOURCE.md`.
 
-| `READY_MODE` | `HTF_MODE` | Signaux sur 41 h |
-|---|---|---|
-| cooldown | contrarian | 20 |
-| cooldown | clear | 31 |
-| cooldown | off | 38 |
-| armed | contrarian | 26 |
-| armed | clear | 36 |
-| armed | off | 45 |
+1. **`Filter_Ready_Window` n'est ni un delai de recharge ni une fenetre d'armement.**
+   C'est une tolerance par filtre : chaque filtre de "readiness" est teste sur les N
+   bougies precedant le declenchement et il suffit qu'il ait ete satisfait **une fois**.
+   Les filtres d'execution, eux, doivent passer sur la bougie de signal. Mes deux
+   lectures precedentes etaient fausses toutes les deux.
+2. **L'espacement des fleches est un parametre distinct** : `Min_Bars_Between` = 5.
+   C'est lui qui evite les grappes de signaux consecutifs.
+3. **Le filtre HTF a une porte de secours.** Il accepte par *biais* (bougie HTF dans le
+   sens du trade, corps >= 35 % du range) **ou** par *spring / upthrust* (la bougie HTF
+   balaye l'extreme des 20 bougies HTF precedentes puis referme a l'interieur). C'est
+   cette seconde porte qui explique l'observation qui bloquait tout : un achat peut
+   apparaitre alors que la H1 est baissiere.
 
-Meme la combinaison la plus stricte signale environ **5 fois trop**. Un etage
-supplementaire de l'indicateur n'est donc pas reproduit — continuer a deviner serait
-inefficace.
+`HTF_MODE=sourced` (defaut) transcrit cette logique. Effet sur la densite de signaux,
+sur 498 bougies M5 (~41 h), a comparer aux **3 fleches** observees sur ~32 h :
 
-**Ce qui trancherait tout de suite** : les horodatages exacts de quelques fleches.
-Survolez une fleche dans MT4, l'infobulle donne un nom d'objet du type
-`ECS_Line_1788221100_TP3` dont l'entier est un timestamp Unix. Trois ou quatre suffisent :
-il devient alors possible de garder l'interpretation qui reproduit ces bougies-la et
-rejette les autres, au lieu d'en tester une a l'aveugle.
+| `HTF_MODE` | Signaux |
+|---|---|
+| `sourced` | **7** |
+| `aligned` | 13 |
+| `contrarian` | 20 |
+| `clear` | 32 |
+| `off` | 39 |
 
-`npm run signals` sort la liste en heure serveur MT4, `npm run calibrate -- <iso>` detaille
-une bougie precise, etage par etage.
+L'ordre de grandeur est enfin le bon. Il reste un ecart, attendu : le declencheur de
+`Enigma Cipher S` est un motif de **pression de bougie**, alors que celui du frere lu
+est un **epuisement de mouvement** (serie de plus-bas puis cloture au-dessus du milieu).
+Seul le vrai source `Enigma Cipher S.mq4` fermerait completement l'ecart.
+
+### Le chemin qui evite la reconstruction
+
+`mt4/EnigmaTester.mq4` lit les fleches de l'indicateur **reel** et ouvre la position
+correspondante, pour que le Strategy Tester de MT4 le juge directement. Aucune
+reconstruction, donc aucune approximation. Voir `mt4/README.md`.
 
 ## Mode proposition : du signal a l'ordre
 

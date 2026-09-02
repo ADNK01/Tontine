@@ -27,8 +27,11 @@ export interface EnigmaContext {
   htf?: Candle[];
 }
 
-/** Pression de la derniere bougie HTF entierement cloturee avant `time`. */
-function htfPressureAt(htf: Candle[] | undefined, time: number): { pressure: number; bodyAtr: number } | null {
+/** Derniere bougie HTF entierement cloturee avant `time`, avec ses mesures. */
+function htfPressureAt(
+  htf: Candle[] | undefined,
+  time: number,
+): { pressure: number; bodyAtr: number; index: number; bodyRatio: number; atr: number } | null {
   if (!htf || htf.length === 0) return null;
   let idx = -1;
   for (let k = 0; k < htf.length; k++) {
@@ -41,7 +44,48 @@ function htfPressureAt(htf: Candle[] | undefined, time: number): { pressure: num
   if (idx < config.atrPeriod) return null;
   const c = htf[idx] as Candle;
   const a = atr(htf, config.atrPeriod, idx);
-  return { pressure: pressure(c), bodyAtr: a && a > 0 ? Math.abs(c.close - c.open) / a : 0 };
+  const range = c.high - c.low;
+  return {
+    pressure: pressure(c),
+    bodyAtr: a && a > 0 ? Math.abs(c.close - c.open) / a : 0,
+    bodyRatio: range > 0 ? Math.abs(c.close - c.open) / range : 1,
+    atr: a ?? 0,
+    index: idx,
+  };
+}
+
+/**
+ * Chemin "spring / upthrust" du filtre HTF, transcrit du code source d'un
+ * indicateur frere : la bougie HTF balaye l'extreme des `rangeLookback` bougies
+ * HTF precedentes, d'une amplitude comprise entre `sweepAtrMin` et `sweepAtrMax`
+ * x ATR HTF, puis referme a l'interieur du range.
+ */
+function htfSweepOk(htf: Candle[], idx: number, side: 'BUY' | 'SELL', atrHtf: number): boolean {
+  const e = config.enigma;
+  if (!(atrHtf > 0)) return false;
+  const from = idx - e.rangeLookback;
+  const to = idx - e.rangeMinAge;
+  if (from < 0 || to <= from) return false;
+
+  let rangeLow = Infinity;
+  let rangeHigh = -Infinity;
+  for (let k = from; k <= to; k++) {
+    const c = htf[k] as Candle;
+    if (c.low < rangeLow) rangeLow = c.low;
+    if (c.high > rangeHigh) rangeHigh = c.high;
+  }
+  if (!(rangeLow < rangeHigh)) return false;
+
+  const bar = htf[idx] as Candle;
+  const minD = atrHtf * e.sweepAtrMin;
+  const maxD = atrHtf * e.sweepAtrMax;
+
+  if (side === 'BUY') {
+    const spring = rangeLow - bar.low;
+    return spring >= minD && spring <= maxD && bar.close > rangeLow;
+  }
+  const upthrust = bar.high - rangeHigh;
+  return upthrust >= minD && upthrust <= maxD && bar.close < rangeHigh;
 }
 
 export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContext = {}): StrategySignal | null {
@@ -86,7 +130,7 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
       return neutral(`Setup haussier rejete : ${depthLabel()} ${depth.toFixed(3)} < ${e.minContextDepth}.`);
     }
     const htf = htfPressureAt(ctx.htf, bar.openTime);
-    const htfVerdict = checkHtf(htf, 'BUY');
+    const htfVerdict = checkHtf(htf, 'BUY', ctx.htf);
     if (htfVerdict) return neutral(`Setup haussier rejete : ${htfVerdict}`);
     if (e.requireConfirmation) {
       const conf = confirms(candles, i, 'BUY', e.confirmationBars);
@@ -114,7 +158,7 @@ export function evaluateEnigmaAt(candles: Candle[], i: number, ctx: EnigmaContex
       return neutral(`Setup baissier rejete : ${depthLabel()} ${depth.toFixed(3)} < ${e.minContextDepth}.`);
     }
     const htf = htfPressureAt(ctx.htf, bar.openTime);
-    const htfVerdict = checkHtf(htf, 'SELL');
+    const htfVerdict = checkHtf(htf, 'SELL', ctx.htf);
     if (htfVerdict) return neutral(`Setup baissier rejete : ${htfVerdict}`);
     if (e.requireConfirmation) {
       const conf = confirms(candles, i, 'SELL', e.confirmationBars);
@@ -161,7 +205,11 @@ const depthLabel = (): string =>
  * la seule fleche calibree jusqu'ici (achat avec une H1 a 21% de pression) exclut
  * le mode "aligned" et reste compatible avec "contrarian" et "clear".
  */
-function checkHtf(htf: { pressure: number; bodyAtr: number } | null, side: 'BUY' | 'SELL'): string | null {
+function checkHtf(
+  htf: { pressure: number; bodyAtr: number; bodyRatio: number; atr: number; index: number } | null,
+  side: 'BUY' | 'SELL',
+  htfCandles?: Candle[],
+): string | null {
   const e = config.enigma;
   if (!e.useHtf || e.htfMode === 'off') return null;
   if (!htf) return 'pas de donnee HTF cloturee disponible.';
@@ -169,6 +217,17 @@ function checkHtf(htf: { pressure: number; bodyAtr: number } | null, side: 'BUY'
   const p = htf.pressure;
   const min = e.htfMinPressure;
   const max = 1 - min;
+
+  // Mode transcrit du code source d'un indicateur frere : deux portes d'entree.
+  if (e.htfMode === 'sourced') {
+    const decisive = htf.bodyRatio >= e.htfBodyRatio;
+    const biasOk = decisive && (side === 'BUY' ? p >= 0.5 : p <= 0.5);
+    if (biasOk) return null;
+    if (htfCandles && htfSweepOk(htfCandles, htf.index, side, htf.atr)) return null;
+    return `H1 contraire : pression ${p.toFixed(2)}, corps ${(htf.bodyRatio * 100).toFixed(0)}% du range, ` +
+      `et aucun ${side === 'BUY' ? 'spring' : 'upthrust'} H1.`;
+  }
+
   switch (e.htfMode) {
     case 'aligned':
       return side === 'BUY'

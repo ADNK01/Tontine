@@ -80,7 +80,19 @@ export const config = {
      *  clear      : la H1 doit seulement avoir une direction NETTE, dans un sens ou l'autre
      *  off        : filtre desactive
      */
-    htfMode: (process.env.HTF_MODE ?? 'contrarian') as 'aligned' | 'contrarian' | 'clear' | 'off',
+    htfMode: (process.env.HTF_MODE ?? 'sourced') as 'sourced' | 'aligned' | 'contrarian' | 'clear' | 'off',
+    /**
+     * Parametres du chemin "spring / upthrust" du filtre HTF, lus dans le code
+     * source d'un indicateur frere (Sdv_Wyckoff / SDC Exhaust 3.03) : la bougie HTF
+     * balaye l'extreme des N dernieres bougies HTF puis referme a l'interieur.
+     */
+    htfBodyRatio: num(process.env.HTF_BODY_RATIO, 0.35),
+    rangeLookback: num(process.env.RANGE_LOOKBACK, 20),
+    rangeMinAge: num(process.env.RANGE_MIN_AGE, 3),
+    sweepAtrMin: num(process.env.SWEEP_ATR_MIN, 0.3),
+    sweepAtrMax: num(process.env.SWEEP_ATR_MAX, 5.0),
+    /** Espacement minimal entre deux signaux, en bougies (Min_Bars_Between). */
+    minBarsBetween: num(process.env.MIN_BARS_BETWEEN, 5),
     htfMinBodyAtr: num(process.env.HTF_MIN_BODY_ATR, 0.0),
     slAtrMulti: num(process.env.SL_ATR_MULTI, 1.8),
     tp1RR: num(process.env.TP1_RR, 1.0),

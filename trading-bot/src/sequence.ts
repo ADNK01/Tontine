@@ -42,8 +42,9 @@ export function collectSignals(candles: Candle[], htf: Candle[] | undefined, fro
       const barsSinceHtfClose = barsSinceLastHtfClose(candles, htf, i);
       if (barsSinceHtfClose === null || barsSinceHtfClose > config.enigma.filterReadyWindow) continue;
     }
-    // Mode "cooldown" : une seule fleche par retournement.
-    if (config.enigma.readyMode === 'cooldown' && i - lastIndex <= config.enigma.filterReadyWindow) continue;
+    // "Min_Bars_Between" : espacement minimal entre deux signaux. Le code source
+    // montre que c'est ce parametre, et non Filter_Ready_Window, qui evite les grappes.
+    if (i - lastIndex < config.enigma.minBarsBetween) continue;
 
     lastIndex = i;
     out.push({ index: i, signal: actionable });
