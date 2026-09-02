@@ -24,6 +24,9 @@ const baseEnv = {
   W_USE_ER_QUALITY: 'false',
   W_USE_CUSUM: 'false',
   ALLOW_CACHE_FALLBACK: 'true',
+  // Sans cela, le chargeur ne garderait que les CANDLE_LIMIT dernieres bougies
+  // (500 par defaut) et l'historique telecharge serait tronque en silence.
+  CANDLE_LIMIT: '1000000',
 };
 
 function run(script: string, env: NodeJS.ProcessEnv, show = false): string {

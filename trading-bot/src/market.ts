@@ -72,6 +72,12 @@ export async function getCandles(
     const { candles, label } = await loadFromCache(symbol, interval);
     log.warn(`Repli sur un snapshot de bougies REELLES archive : ${label}`);
     log.warn("Ce n'est pas du temps reel. Les resultats decrivent la fenetre du snapshot, pas le marche actuel.");
+    if (candles.length > limit) {
+      log.warn(
+        `Le cache contient ${candles.length} bougies mais CANDLE_LIMIT vaut ${limit} : ` +
+          `seules les ${limit} dernieres sont utilisees. Augmentez CANDLE_LIMIT pour exploiter tout l'historique.`,
+      );
+    }
     return { candles: candles.slice(-limit), source: 'cached-snapshot', sourceLabel: `snapshot archive — ${label}` };
   }
 }
