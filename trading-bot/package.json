@@ -11,7 +11,8 @@
     "scan": "tsx src/index.ts scan",
     "replay:raw": "tsx src/index.ts replay:raw",
     "replay:memory": "tsx src/index.ts replay:memory",
-    "memory:reset": "tsx src/index.ts memory:reset"
+    "memory:reset": "tsx src/index.ts memory:reset",
+    "diagnose": "tsx src/index.ts diagnose"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

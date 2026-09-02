@@ -1,9 +1,10 @@
-# Bot de paper-trading — BTCUSDT / MA 9-21 / memoire deux fichiers
+# Bot de paper-trading — BTCUSD M15 / Enigma Cipher / memoire deux fichiers
 
 Bot de trading **papier uniquement**, en TypeScript + Node.js.
-Il lit des bougies reelles, calcule un signal de croisement de moyennes mobiles,
-le passe par un controle de risque, simule un ordre papier, puis apprend de ses
-resultats reels via deux fichiers de memoire.
+Il lit des bougies reelles, calcule un signal (strategie "Enigma Cipher"
+reconstruite, ou croisement de moyennes mobiles), dimensionne la position depuis
+le capital reel, simule un ordre papier, puis apprend de ses resultats reels via
+deux fichiers de memoire.
 
 > **Aucun ordre reel n'est jamais envoye.** Il n'existe aucun chemin de code vers
 > un endpoint d'ordre live, et aucune cle API n'est demandee.
@@ -27,6 +28,7 @@ Node 20+ requis.
 | `npm run replay:raw` | Rejoue la strategie **sans memoire** sur l'historique reel. C'est la baseline honnete. |
 | `npm run replay:memory` | Meme fenetre, mais chaque setup est confronte a la memoire, avec comparaison chiffree |
 | `npm run memory:reset` | Vide `data/ledger.csv` et `data/learnings.md` |
+| `npm run diagnose` | Montre a quel etage du filtre les bougies sont eliminees |
 
 Ordre d'utilisation recommande :
 
@@ -36,6 +38,58 @@ npm run replay:raw      # construire la baseline + remplir la memoire avec du re
 npm run replay:memory   # voir ce que la memoire change, chiffres a l'appui
 npm run memory:reset    # repartir de zero
 ```
+
+
+## La strategie "Enigma Cipher S" (par defaut)
+
+> **Reconstruction, pas une copie.** Cette implementation est deduite des **noms et
+> valeurs des parametres** de l'indicateur MT4, lus sur des captures d'ecran. Le code
+> source du `.ex4` n'est pas disponible : **la logique interne exacte est inconnue**.
+> Les fleches de l'indicateur et les signaux de ce bot peuvent differer. Comparez
+> signal par signal sur le meme graphique avant d'accorder la moindre confiance a ces
+> chiffres.
+
+Lecture retenue : **un retournement apres balayage de liquidite**.
+
+| Etage | Regle | Parametre |
+|---|---|---|
+| 1. Range | La bougie doit etre assez grande | `Min_Range_ATR` = 0.5 |
+| 2. Corps | Le corps doit occuper une part du range | `Min_Body_Efficiency` = 0.25 |
+| 3. Contexte | Sur les 8 bougies precedentes, le camp oppose domine | `Momentum_Bars` = 8, `Bear_Context_Max` = 0.4, `Bull_Context_Min` = 0.6 |
+| 4. Pression | La bougie referme a l'oppose du contexte | `Bull_Reversal_Min` = 0.72, `Bear_Reversal_Max` = 0.28 |
+| 5. Balayage | Elle casse l'extreme du contexte avant de refermer | `Min_Context_Depth` = 0.05 x ATR |
+| 6. HTF | L'unite superieure valide le sens | `Use_HTF` = true, `HTF_Period` = H1, `HTF_Min_Pressure` = 0.6 |
+| 7. Confirmation | Optionnelle, desactivee chez vous | `Require_Confirmation` = false |
+| Sortie | SL a 1.8 x ATR, objectifs a 1R / 2R / 3R | `SL_ATR_Multi`, `TP1/2/3_RR` |
+
+La **pression** d'une bougie est `(cloture - plus bas) / (plus haut - plus bas)` :
+1.0 = cloture sur le haut, 0.0 = cloture sur le bas.
+
+**Points d'incertitude assumes**, a verifier contre l'indicateur :
+- `Min_Context_Depth` (0.05) : interprete comme la profondeur du balayage en multiples
+  d'ATR. C'est l'etage qui elimine le plus de candidats — si le vrai sens differe, le
+  nombre de signaux change beaucoup. `npm run diagnose` le montre.
+- `Filter_Ready_Window` (5) : non implemente comme fenetre glissante ; les filtres sont
+  evalues sur la bougie de signal.
+- Les filtres desactives chez vous (`Use_Volume`, `Use_Session`, `Use_Spread`,
+  `Use_Divergence`, `Use_CUSUM`, `Use_ZScore`, `Use_ER_Quality`, reversals ATR/RS) ne
+  sont **pas** implementes, puisqu'ils sont a `false` dans votre configuration.
+
+### Ce que ca donne sur donnees reelles
+
+Fenetre BTCUSD M15, 500 bougies reelles (28 aout -> 2 sept), sortie SL 1.8 ATR / TP 1R :
+
+```
+Bougies analysees : 475
+SIGNAUX RETENUS   : 1 achat, 1 vente
+    35  Range trop petit          98  Corps trop faible
+   293  Pression/contexte hors seuils
+    37  Balayage trop court       10  Filtre HTF contraire
+```
+
+**2 signaux en 5 jours.** Les deux gagnants (+2.00 R au total), mais **deux trades ne
+prouvent rien** : c'est un echantillon sans aucune valeur statistique. Il faut des
+centaines de setups sur plusieurs regimes de marche avant de parler de performance.
 
 ## D'ou viennent les donnees
 
@@ -93,6 +147,59 @@ si vous le remplissez avec la meme fenetre que celle que vous rejouez, la compar
 est *in-sample*. Pour un test propre : construisez la memoire sur une fenetre, puis
 rejouez sur une autre (autre `SYMBOL`, autre `INTERVAL`, autre periode).
 
+
+## Le probleme du capital de 20 $
+
+C'est le point le plus important de ce document, et il ne depend d'aucune opinion :
+c'est de l'arithmetique sur vos propres parametres.
+
+Le stop de la strategie vaut **1.8 x ATR**. Sur BTCUSD M15, avec l'ATR mesure sur les
+donnees reelles de la fenetre de test :
+
+| Hypothese ATR | SL (1.8 ATR) | Perte au lot min 0.01 | % d'un compte de 20 $ | Capital pour risquer 1% | pour 2% | pour 5% |
+|---|---|---|---|---|---|---|
+| ATR moyen de la fenetre : 193 $ | 348 $ | 3.48 $ | 17 % | 348 $ | 174 $ | 70 $ |
+| ATR actuel (plus volatil) : 316 $ | 569 $ | 5.69 $ | 28 % | 569 $ | 285 $ | 114 $ |
+
+Hypotheses : BTCUSD, taille de contrat 1 BTC par lot, lot minimum 0.01.
+**Verifiez ces deux valeurs** dans MT4 : clic droit sur BTCUSD dans Market Watch ->
+Specification. Si votre broker utilise d'autres valeurs, changez `CONTRACT_SIZE` et
+`MIN_LOT` dans `.env`, tout le calcul suit.
+
+Conclusion : **au lot minimum, un seul stop coute 17 a 28 % de votre compte.**
+Trois pertes d'affilee — ce qui arrive avec n'importe quelle strategie — et il ne reste
+presque rien. Le bot refuse donc ces trades et l'ecrit noir sur blanc :
+
+```
+ATTENTION | 2 setup(s) sur 2 rejete(s) par le dimensionnement.
+ATTENTION | Lot theorique 0.0006 sous le lot minimum 0.01. Au lot minimum, un stop
+            touche coute 3.57 soit 17.9% du capital de 20.00 (budget vise : 1.0%).
+            Capital necessaire pour respecter 1.0% de risque : environ 357.20.
+```
+
+### Les options reelles
+
+1. **Rester en papier** avec ce bot jusqu'a ce que le capital suive. Gratuit, et c'est
+   ce que le projet fait deja.
+2. **Un compte Cent**, si votre broker en propose un. Le lot y porte 100 fois moins :
+   20 $ deviennent 2000 cents et le risque par trade redevient dimensionnable. C'est la
+   seule facon connue de trader 20 $ sans risquer 20 % par position. Verifiez les specs
+   avant d'ouvrir quoi que ce soit.
+3. **Un instrument a plus petit notionnel** que le BTC. Le calcul est le meme : mettez
+   `CONTRACT_SIZE`, `MIN_LOT` et l'ATR de l'instrument dans `.env`, le bot vous dira
+   immediatement si c'est finançable.
+4. **Augmenter le capital** avant de trader cette strategie sur BTCUSD : environ 350 $
+   pour un risque de 1 % par trade, 175 $ pour 2 %.
+
+Ce qui **ne marche pas** : augmenter le risque par trade jusqu'a ce que ca passe. A 20 %
+de risque par position, une serie de 4 pertes — statistiquement banale — efface le compte.
+Ce n'est pas de la prudence excessive, c'est la raison pour laquelle le module de
+dimensionnement existe.
+
+> Votre capture montre un compte **FBS-Real-9**, donc un compte reel, avec AutoTrading
+> actif et un solde de 0.00 USD. Ce bot ne s'y connecte pas et ne peut pas y envoyer
+> d'ordre : il n'a aucun adaptateur broker. Rien de ce qu'il fait ne touche ce compte.
+
 ## Configurer / experimenter
 
 Tout est dans `src/config.ts`, surchargeable par `.env` ou en ligne :
@@ -116,6 +223,16 @@ REPLAY_HORIZON=24 npm run replay:raw
 | `MEMORY_MIN_LOSSES` | `2` | Pertes reelles avant blocage |
 | `MEMORY_MAX_WIN_RATE` | `0.5` | Seuil de reussite sous lequel un setup est mauvais |
 | `ALLOW_CACHE_FALLBACK` | `true` | Autorise le snapshot reel en repli |
+| `STRATEGY` | `enigma` | `enigma` ou `ma` |
+| `ACCOUNT_BALANCE` | `20` | Capital, en devise du compte |
+| `RISK_PER_TRADE` | `0.01` | Risque par trade (0.01 = 1%) |
+| `CONTRACT_SIZE` | `1` | Taille d'un lot (BTCUSD : 1 BTC) |
+| `MIN_LOT` / `LOT_STEP` | `0.01` | Contraintes du broker |
+| `SL_ATR_MULTI` | `1.8` | Stop en multiples d'ATR |
+| `TARGET_RR` | `1` | Objectif utilise en replay : 1, 2 ou 3 |
+| `MIN_CONTEXT_DEPTH` | `0.05` | Profondeur de balayage exigee (x ATR) |
+| `HTF_MIN_PRESSURE` | `0.6` | Pression H1 exigee |
+| `USE_HTF`, `USE_CONTEXT_DEPTH` | `true` | Activation des etages du filtre |
 
 ## Structure
 
@@ -125,7 +242,11 @@ src/
   types.ts           types partages
   logger.ts          logs horodates
   market.ts          bougies reelles : HTTP public puis repli snapshot
-  strategy.ts        croisement MA 9/21 + etiquetage du regime
+  strategy.ts        aiguillage de strategie + croisement MA 9/21
+  enigma.ts          strategie Enigma Cipher (reconstruction)
+  indicators.ts      ATR, pression, efficacite du corps, agregation HTF
+  sizing.ts          taille de position depuis le capital reel
+  diagnose.ts        funnel du filtre
   risk.ts            approuve / rejette, avec raison
   execution.ts       simulation papier + garde-fou TRADING_MODE
   memory.ts          lecture/ecriture ledger.csv et learnings.md
@@ -143,9 +264,11 @@ trading_bot_instructions.md   regles de reference du bot
 ## Regles de securite et limites
 
 - Paper/local uniquement. Pas de trading live, pas de cle API, pas de secret en clair.
-- Le replay mesure une sortie **a horizon fixe** (N bougies), pas un stop-loss ni un
-  take-profit reels. Les frais et le slippage ne sont pas modelises : les PnL affiches
-  sont donc **optimistes** par rapport a une execution reelle.
+- La strategie Enigma est une **reconstruction non verifiee** (voir plus haut).
+- Le replay simule SL et TP bougie par bougie. Il ne voit pas l'interieur d'une bougie :
+  si SL et TP sont touches dans la meme bougie, il compte le **stop** (hypothese prudente).
+- **Ni les frais, ni le spread, ni le swap, ni le slippage ne sont modelises.** Sur BTCUSD
+  le spread est large : les PnL affiches sont **optimistes**.
 - Une fenetre de quelques centaines de bougies n'a aucune valeur statistique.
   Ne concluez rien sur la rentabilite a partir de ces chiffres.
 - Le filtre memoire peut degrader les resultats : sur la fenetre de test livree,
@@ -155,15 +278,13 @@ trading_bot_instructions.md   regles de reference du bot
 
 ## Resultat reel du premier run (a titre d'exemple, pas de promesse)
 
-Fenetre BTCUSDT 1h, 500 bougies reelles (2026-08-12 -> 2026-09-02), horizon 12 bougies,
-quantite 0.01 :
+Strategie Enigma, BTCUSD M15, 500 bougies reelles (28 aout -> 2 sept), SL 1.8 ATR, cible 1R :
 
-| | sans memoire | avec memoire |
-|---|---|---|
-| Setups pris | 20 | 15 (5 filtres) |
-| Taux de reussite | 55.0% | 53.3% |
-| PnL total | +11.77 USDT | +0.07 USDT |
-| Drawdown max | 51.06 | 51.06 |
+| | valeur |
+|---|---|
+| Setups detectes | 2 |
+| Setups pris avec 20 $ de capital | **0** (rejetes par le dimensionnement) |
+| Resultat au lot minimum, a titre de mesure | 2 gagnants, +2.00 R, +5.03 $ |
 
-La memoire a filtre 5 setups, dont plusieurs qui auraient ete gagnants : elle a
-**coute** 11.70 USDT sur cette fenetre. Les chiffres sont ceux des donnees reelles.
+Le chiffre a retenir n'est pas le +5.03 $ : c'est le **0**. Avec 20 $, cette strategie sur
+cet instrument n'est pas finançable, et deux trades ne demontrent rien.

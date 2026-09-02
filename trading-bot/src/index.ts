@@ -2,6 +2,7 @@
 /** CLI : scan | replay:raw | replay:memory | memory:reset */
 import { runScan } from './bot.js';
 import { runReplay } from './replay.js';
+import { runDiagnose } from './diagnose.js';
 import { resetMemory } from './memory.js';
 import { log } from './logger.js';
 import { paths } from './config.js';
@@ -13,6 +14,7 @@ Usage : npm run <commande>
   replay:raw      Baseline honnete de la strategie, sans memoire
   replay:memory   Meme strategie filtree par la memoire, avec comparaison
   memory:reset    Vide data/ledger.csv et data/learnings.md
+  diagnose        Montre a quel etage du filtre les bougies sont eliminees
 `;
 
 async function main(): Promise<void> {
@@ -26,6 +28,9 @@ async function main(): Promise<void> {
       break;
     case 'replay:memory':
       await runReplay('memory');
+      break;
+    case 'diagnose':
+      await runDiagnose();
       break;
     case 'memory:reset':
       await resetMemory();

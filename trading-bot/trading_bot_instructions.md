@@ -8,7 +8,7 @@ Un bot de **paper-trading** en TypeScript/Node.js qui lit des bougies reelles,
 applique une strategie de croisement de moyennes mobiles, filtre par le risque,
 simule un ordre papier, et apprend de ses propres resultats reels.
 
-- Marche de depart : **BTCUSDT**, interval **5m**
+- Marche de depart : **BTCUSD**, interval **M15** (celui du graphique MT4)
 - Aucun trade reel, jamais. Le paper-trading vient en premier parce qu'une
   strategie non verifiee sur donnees reelles n'a aucune valeur.
 
@@ -22,20 +22,43 @@ simule un ordre papier, et apprend de ses propres resultats reels.
 
 ## 3. Regles de strategie
 
-- Indicateurs : SMA rapide **9**, SMA lente **21**, SMA de regime **50**.
-- **BUY** : la MA9 croise au dessus de la MA21 sur la derniere bougie cloturee.
-- **SELL** : la MA9 croise en dessous de la MA21.
-- **HOLD** : pas de croisement frais sur cette bougie.
-- Pas de repaint : la bougie en cours de formation est toujours exclue.
-- Chaque setup est etiquete `SYMBOLE|MA9x21|CROSS_UP|TREND_UP` (croisement + regime),
-  c'est cette cle que la memoire apprend.
+Strategie active : **Enigma Cipher S (reconstruction)**, parametres repris des captures
+MT4. Le code source de l'indicateur n'etant pas disponible, la logique est deduite des
+noms de parametres et **doit etre verifiee** signal par signal contre les fleches de
+l'indicateur.
+
+Etages du filtre, dans l'ordre :
+1. Range de la bougie >= `Min_Range_ATR` (0.5) x ATR(14).
+2. Corps >= `Min_Body_Efficiency` (0.25) du range.
+3. Contexte sur `Momentum_Bars` (8) bougies : pression moyenne <= 0.4 (achat) ou >= 0.6 (vente).
+4. Pression de la bougie de signal >= 0.72 (achat) ou <= 0.28 (vente).
+5. Balayage de l'extreme du contexte >= `Min_Context_Depth` (0.05) x ATR.
+6. Filtre H1 : pression >= `HTF_Min_Pressure` (0.6) dans le sens du trade.
+7. Confirmation desactivee (`Require_Confirmation` = false).
+
+Sortie : **SL a 1.8 x ATR**, objectifs a 1R / 2R / 3R. Le replay sort au SL ou au TP,
+avec le stop prioritaire si les deux sont touches dans la meme bougie.
+
+Pas de repaint : la bougie en cours de formation est toujours exclue, et le filtre H1
+n'utilise que des bougies H1 deja cloturees.
+
+Strategie de repli disponible : croisement MA 9/21 (`STRATEGY=ma`).
 
 ## 4. Regles de risque
 
-- `QUANTITY` configurable (defaut 0.01), `MAX_POSITION` configurable (defaut 0.05).
-- Si `QUANTITY > MAX_POSITION` -> action finale **SKIP**.
-- Quantite nulle ou negative -> **SKIP**.
+- Le capital est declare (`ACCOUNT_BALANCE`, defaut 20) et le risque par trade aussi
+  (`RISK_PER_TRADE`, defaut 1%).
+- La taille de position est **calculee** : `lot = (capital x risque) / (distance SL x taille contrat)`.
+- Si le lot theorique tombe sous le lot minimum du broker -> **SKIP**, avec le capital
+  minimum necessaire indique en clair. Aucun arrondi vers le haut, jamais.
+- `MAX_POSITION` plafonne la taille meme quand le calcul l'autorise.
 - Toute decision porte une raison en francais clair.
+
+### Contrainte reelle actuelle
+
+Avec 20 $ de capital, un SL de 1.8 x ATR sur BTCUSD M15 coute 17 a 28 % du compte au lot
+minimum. **Aucun trade n'est finançable a 1 % de risque** : le bot refuse, et c'est le
+comportement attendu, pas un bug.
 
 ## 5. Regles broker / MCP
 

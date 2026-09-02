@@ -29,6 +29,13 @@ export interface StrategySignal {
   slowMA: number;
   /** Cle de setup : sert de clef d'apprentissage pour la memoire. */
   setupKey: string;
+  /** ATR au moment du signal, si la strategie en calcule un. */
+  atr?: number;
+  /** Stop loss et objectifs, si la strategie les definit. */
+  sl?: number;
+  tp1?: number;
+  tp2?: number;
+  tp3?: number;
 }
 
 export interface RiskDecision {
@@ -74,6 +81,11 @@ export interface ReplayTrade {
   pnlPct: number;
   outcome: Extract<Outcome, 'WIN' | 'LOSS' | 'FLAT'>;
   reason: string;
+  /** Comment la position s'est terminee. */
+  exitKind: 'TP' | 'SL' | 'TIMEOUT' | 'HORIZON';
+  /** Resultat exprime en multiple du risque initial (R). */
+  rMultiple: number;
+  lots: number;
 }
 
 export interface ReplaySkip {
@@ -86,6 +98,7 @@ export interface ReplaySkip {
   reason: string;
   /** Ce que le setup aurait rapporte s'il n'avait pas ete filtre (mesure honnete du filtre). */
   avoidedPnl: number;
+  avoidedR: number;
 }
 
 export interface ReplaySummary {
@@ -105,4 +118,6 @@ export interface ReplaySummary {
   best: number;
   worst: number;
   maxDrawdown: number;
+  /** Resultat cumule en multiples du risque : comparable entre capitaux. */
+  totalR: number;
 }

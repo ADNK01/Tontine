@@ -4,6 +4,7 @@
  * Aucun repaint : la decision d'une bougie n'utilise que des bougies deja cloturees.
  */
 import { config } from './config.js';
+import { evaluateEnigmaAt, type EnigmaContext } from './enigma.js';
 import type { Candle, StrategySignal } from './types.js';
 
 export function sma(values: number[], period: number, endIndex: number): number | null {
@@ -19,7 +20,12 @@ export function sma(values: number[], period: number, endIndex: number): number 
  * SELL : la MA rapide passe en dessous entre i-1 et i.
  * HOLD : pas de croisement frais sur cette bougie.
  */
-export function evaluateAt(candles: Candle[], i: number): StrategySignal | null {
+/** Aiguillage : la strategie active est choisie par config.strategy. */
+export function evaluateAt(candles: Candle[], i: number, ctx: EnigmaContext = {}): StrategySignal | null {
+  return config.strategy === 'enigma' ? evaluateEnigmaAt(candles, i, ctx) : evaluateMaCrossAt(candles, i);
+}
+
+export function evaluateMaCrossAt(candles: Candle[], i: number): StrategySignal | null {
   const { fastPeriod, slowPeriod } = config;
   if (i < 1) return null;
   const closes = candles.map((c) => c.close);
@@ -64,6 +70,6 @@ export function evaluateAt(candles: Candle[], i: number): StrategySignal | null 
 }
 
 /** Signal sur la derniere bougie cloturee. */
-export function evaluateLatest(candles: Candle[]): StrategySignal | null {
-  return evaluateAt(candles, candles.length - 1);
+export function evaluateLatest(candles: Candle[], ctx: EnigmaContext = {}): StrategySignal | null {
+  return evaluateAt(candles, candles.length - 1, ctx);
 }
