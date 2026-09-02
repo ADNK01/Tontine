@@ -1,0 +1,21 @@
+{
+  "name": "paper-trading-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot de paper-trading (BTCUSDT 5m, croisement MA 9/21) avec systeme de memoire deux fichiers. Aucune execution reelle.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "scan": "tsx src/index.ts scan",
+    "replay:raw": "tsx src/index.ts replay:raw",
+    "replay:memory": "tsx src/index.ts replay:memory",
+    "memory:reset": "tsx src/index.ts memory:reset"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

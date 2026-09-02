@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+
+# La memoire est locale et propre a chaque session de paper-trading.
+data/ledger.csv
+data/learnings.md
