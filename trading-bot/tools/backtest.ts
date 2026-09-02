@@ -29,9 +29,15 @@ const baseEnv = {
   CANDLE_LIMIT: '1000000',
 };
 
+/**
+ * Lance un script TypeScript dans un processus enfant.
+ * On invoque Node directement avec le chargeur tsx plutot que `npx` via un shell :
+ * cela evite la concatenation d'arguments non echappes (DeprecationWarning DEP0190)
+ * et fonctionne identiquement sous Windows, macOS et Linux.
+ */
 function run(script: string, env: NodeJS.ProcessEnv, show = false): string {
-  const r = spawnSync('npx', ['tsx', script], {
-    env, shell: true, encoding: 'utf8', stdio: show ? 'inherit' : 'pipe',
+  const r = spawnSync(process.execPath, ['--import', 'tsx', script], {
+    env, encoding: 'utf8', stdio: show ? 'inherit' : 'pipe',
   });
   return show ? '' : `${r.stdout ?? ''}`;
 }
@@ -71,8 +77,9 @@ if (existsSync(cache) && !suffisant) {
 
 if (!existsSync(cache) || !suffisant) {
   if (!existsSync(cache)) console.log(`Historique absent, telechargement de ~${years} an(s)...\n`);
-  const r = spawnSync('npx', ['tsx', 'tools/fetch-history.ts', symbol, interval, years],
-    { shell: true, stdio: 'inherit', env: process.env });
+  const r = spawnSync(process.execPath,
+    ['--import', 'tsx', 'tools/fetch-history.ts', symbol, interval, years],
+    { stdio: 'inherit', env: process.env });
   if (r.status !== 0 || !existsSync(cache)) {
     console.error('\nTelechargement impossible : voir le message ci-dessus. Rien ne peut etre teste.');
     process.exit(1);
