@@ -176,3 +176,100 @@ réglages), pas au classement des cellules.
    avec frais et spread. Pas sur 500 bougies.
 3. **Désactiver ER et CUSUM et baisser `RSI_Swing_Bars`** est ce qui rend le moteur
    de divergence fonctionnel. Aucune des trois versions livrées ne le fait.
+
+---
+
+# Test sur plusieurs années — ce qui a été possible, et ce qui ne l'a pas été
+
+## Le blocage, dit franchement
+
+Aucune source d'historique long n'est joignable depuis cet environnement. Stooq,
+Yahoo Finance, CoinGecko et CryptoCompare répondent tous **403 (refus de politique
+réseau)** au niveau de la passerelle. Le connecteur de marché disponible plafonne à
+500 bougies par appel et ne permet pas de remonter plus loin dans le passé.
+
+**500 bougies journalières = 17 mois.** Un vrai test journalier pluriannuel n'a donc
+pas pu être exécuté ici. Deux substituts ont été utilisés, chacun avec ses limites,
+et aucun ne remplace ce qui manque.
+
+## Substitut 1 — hebdomadaire, 9 ans : inexploitable
+
+BTC hebdomadaire, 473 semaines (août 2017 → août 2026) :
+
+| `RSI_Swing_Bars` | 3 | 5 | 8 | 12 | 20 | 50 |
+|---|---|---|---|---|---|---|
+| Signaux en 9 ans | 3 | 3 | 3 | 3 | 2 | **0** |
+| Trades clôturés | 1 | 1 | 1 | 0 | 0 | 0 |
+
+**Trois signaux en neuf ans.** La stratégie est trop lente pour cette échelle : rien
+n'en sort, et rien ne peut en être conclu. Ce n'est pas un mauvais résultat, c'est
+une absence de résultat.
+
+## Substitut 2 — journalier, 5 actifs, 17 mois
+
+`RSI_Swing_Bars = 8`, sans ER ni CUSUM, cible 1R, sortie à 50 bougies max.
+Période commune : avril 2025 → septembre 2026.
+
+| Actif | Marché sur la période | Signaux | Achats/Ventes | W/L | Total R |
+|---|---|---|---|---|---|
+| BTCUSDT | −11.7 % | 7 | 5/2 | 4/0 | +4.40 |
+| ETHUSDT | +51.5 % | 8 | 7/1 | 4/1 | +3.83 |
+| SOLUSDT | −27.1 % | 10 | 8/2 | 5/1 | +3.53 |
+| BNBUSDT | +15.1 % | 8 | 5/3 | 3/3 | +0.28 |
+| XRPUSDT | −35.6 % | 10 | 9/1 | 5/1 | +3.20 |
+| **Total** | | **43** | 34/9 | **21/6** | **+15.24** |
+
+Réussite globale 77.8 %, espérance **+0.354 R par signal**. À `RSI_Swing_Bars = 5` :
+41 signaux, 20/3, **+17.62 R**, espérance +0.430 R. Positif sur les cinq actifs dans
+les deux réglages.
+
+Trois des cinq marchés ont **baissé** sur la période, alors que la stratégie est
+acheteuse à 79 %. La tendance n'explique donc pas le résultat.
+
+## Le contrôle qui compte : entrées aléatoires
+
+Un taux de réussite de 78 % à un rapport 1:1 est une affirmation forte. Elle a été
+testée contre le hasard : 400 tirages d'entrées aléatoires, même nombre d'entrées,
+même répartition achats/ventes, **exactement les mêmes règles de sortie**
+(`tools/nulltest.ts`).
+
+| Actif | Espérance stratégie | Espérance hasard | Hasard 5 %–95 % | Percentile |
+|---|---|---|---|---|
+| BTCUSDT | **+0.629** | −0.020 | −0.570 … +0.568 | **98e** |
+| ETHUSDT | **+0.479** | −0.054 | −0.592 … +0.447 | **96e** |
+| SOLUSDT | **+0.353** | −0.017 | −0.418 … +0.443 | 91e |
+| BNBUSDT | +0.035 | +0.078 | −0.379 … +0.500 | 43e |
+| XRPUSDT | **+0.320** | −0.175 | −0.565 … +0.299 | **96e** |
+
+Deux enseignements :
+
+1. **Les règles de sortie seules n'ont aucun avantage** : le hasard tourne autour de
+   zéro (−0.175 à +0.078). Le test est donc valide — il mesure bien les entrées.
+2. **Les entrées portent une information** sur 4 actifs sur 5, au-delà du 90e
+   percentile du hasard. Sur BNB, aucun avantage (43e percentile).
+
+## Pourquoi cela ne suffit toujours pas
+
+**Une seule fenêtre temporelle.** Les cinq actifs couvrent les *mêmes* 17 mois, et
+ce sont cinq crypto-actifs fortement corrélés. Ce n'est pas cinq observations
+indépendantes : c'est beaucoup plus proche d'**une seule**. C'est la faiblesse
+principale, et le test pluriannuel qui la corrigerait est précisément celui que
+l'environnement n'a pas permis.
+
+**27 trades réellement clôturés.** Le reste est marqué au marché à 50 bougies.
+
+**Ni frais, ni spread, ni slippage.** Sur un CFD BTCUSD le spread est loin d'être
+négligeable, et il se retranche de chaque trade.
+
+## Ce qui reste vrai, tous tests confondus
+
+1. La stratégie est **négative en M5** à tous les réglages, sans une seule vente.
+2. Elle est **inexploitable en hebdomadaire** : 3 signaux en 9 ans.
+3. En **journalier**, elle bat le hasard sur 4 actifs sur 5 — sur une seule fenêtre
+   de 17 mois, avec 27 trades clôturés, hors frais. C'est un résultat encourageant,
+   ce n'est pas une preuve, et cela ne justifie aucune mise en jeu d'argent réel.
+
+Le test qui trancherait : plusieurs années de journalier, sur des actifs non
+corrélés, frais inclus. Il demande une source de données que cet environnement ne
+peut pas atteindre — mais que le Strategy Tester de MetaTrader, lui, possède
+localement.
