@@ -31,7 +31,7 @@ export const config = {
   regimePeriod: num(process.env.REGIME_MA, 50),
 
   // --- Strategie active ---
-  strategy: (process.env.STRATEGY ?? 'enigma') as 'ma' | 'enigma',
+  strategy: (process.env.STRATEGY ?? 'wyckoff') as 'ma' | 'enigma' | 'wyckoff',
   atrPeriod: num(process.env.ATR_PERIOD, 14),
 
   /** Parametres "Enigma Cipher S", repris des captures MT4. */
@@ -100,6 +100,50 @@ export const config = {
     tp3RR: num(process.env.TP3_RR, 3.0),
     /** Cible utilisee pour sortir en replay : 1, 2 ou 3. */
     targetRR: num(process.env.TARGET_RR, 1),
+  },
+
+  /**
+   * Parametres "SDC Exhaust / Sdv_Wyckoff", transcrits du code source MQL4.
+   * Les valeurs sont celles par defaut du fichier source, pas des suppositions.
+   */
+  wyckoff: {
+    atrPeriod: num(process.env.W_ATR_PERIOD, 14),
+    // Declencheur
+    rangeLookback: num(process.env.W_RANGE_LOOKBACK, 20),
+    rangeMinAge: num(process.env.W_RANGE_MIN_AGE, 3),
+    sweepAtrMin: num(process.env.W_SWEEP_ATR_MIN, 0.3),
+    sweepAtrMax: num(process.env.W_SWEEP_ATR_MAX, 5.0),
+    // Fenetre d'attente entre l'ancre de divergence et le declencheur
+    filterReadyWindow: num(process.env.W_FILTER_READY_WINDOW, 5),
+    // Divergence quantique
+    useQuantumDiv: bool(process.env.W_USE_QUANTUM_DIV, true),
+    useKineticEnergy: bool(process.env.W_USE_KINETIC_ENERGY, true),
+    keDecayThreshold: num(process.env.W_KE_DECAY, 0.5),
+    useOrderFlowDelta: bool(process.env.W_USE_ORDERFLOW, true),
+    usePhaseVelocity: bool(process.env.W_USE_VELOCITY, true),
+    quantumLookback: num(process.env.W_QUANTUM_LOOKBACK, 15),
+    minQuantumConfirms: num(process.env.W_MIN_CONFIRMS, 1),
+    // Divergence cachee
+    useHiddenDiv: bool(process.env.W_USE_HIDDEN_DIV, true),
+    divRsiPeriod: num(process.env.W_DIV_RSI_PERIOD, 7),
+    minOscDiff: num(process.env.W_MIN_OSC_DIFF, 2.0),
+    // Recherche de pivots
+    divLookback: num(process.env.W_DIV_LOOKBACK, 100),
+    divMinGap: num(process.env.W_DIV_MIN_GAP, 5),
+    priceMinDiffAtr: num(process.env.W_PRICE_MIN_DIFF_ATR, 1.0),
+    rsiSwingBars: num(process.env.W_RSI_SWING_BARS, 50),
+    // Sorties
+    slAtrMulti: num(process.env.W_SL_ATR_MULTI, 3.0),
+    tp1RR: num(process.env.W_TP1_RR, 1.0),
+    tp2RR: num(process.env.W_TP2_RR, 1.618),
+    tp3RR: num(process.env.W_TP3_RR, 2.618),
+    targetRR: num(process.env.W_TARGET_RR, 1),
+    // Espacement
+    minBarsBetween: num(process.env.W_MIN_BARS_BETWEEN, 5),
+    scanWindow: num(process.env.W_SCAN_WINDOW, 150),
+    ratioLen: num(process.env.W_RATIO_LEN, 15),
+    /** Taille d'un point du symbole : 0.01 pour un BTCUSD a 2 decimales. */
+    point: num(process.env.W_POINT, 0.01),
   },
 
   // --- Compte et dimensionnement ---

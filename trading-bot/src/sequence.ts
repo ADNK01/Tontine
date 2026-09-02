@@ -4,6 +4,7 @@
  */
 import { config } from './config.js';
 import { evaluateAt } from './strategy.js';
+import { wyckoffSignals } from './wyckoff.js';
 import type { Candle, StrategySignal } from './types.js';
 
 export interface SequencedSignal {
@@ -29,6 +30,31 @@ function barsSinceLastHtfClose(candles: Candle[], htf: Candle[], i: number): num
 }
 
 export function collectSignals(candles: Candle[], htf: Candle[] | undefined, from: number, to: number): SequencedSignal[] {
+  // La strategie Wyckoff est transcrite du source MQL4 : elle balaie l'historique
+  // elle-meme (ancre de divergence puis attente du declencheur) et gere son propre
+  // espacement. On la laisse produire ses signaux, on filtre juste la plage demandee.
+  if (config.strategy === 'wyckoff') {
+    return wyckoffSignals(candles)
+      .filter((w) => w.index >= from && w.index <= to)
+      .map((w) => ({
+        index: w.index,
+        signal: {
+          action: w.side,
+          reason: w.reason,
+          price: w.entry,
+          time: w.time,
+          fastMA: 0,
+          slowMA: 0,
+          setupKey: `${config.symbol}|WYCKOFF|${w.side === 'BUY' ? 'EXHAUST_BUY' : 'EXHAUST_SELL'}`,
+          atr: w.atr,
+          sl: w.sl,
+          tp1: w.tp1,
+          tp2: w.tp2,
+          tp3: w.tp3,
+        } as StrategySignal & { action: 'BUY' | 'SELL' },
+      }));
+  }
+
   const out: SequencedSignal[] = [];
   let lastIndex = -Infinity;
   for (let i = from; i <= to; i++) {

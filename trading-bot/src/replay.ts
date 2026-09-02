@@ -54,7 +54,8 @@ function simulateExit(candles: Candle[], entryIndex: number, signal: StrategySig
     return { exit: (candles[entryIndex + maxHold] as Candle).close, exitKind: 'HORIZON', barsHeld: maxHold };
   }
 
-  const target = config.enigma.targetRR === 3 ? signal.tp3 : config.enigma.targetRR === 2 ? signal.tp2 : signal.tp1;
+  const targetRR = config.strategy === 'wyckoff' ? config.wyckoff.targetRR : config.enigma.targetRR;
+  const target = targetRR === 3 ? signal.tp3 : targetRR === 2 ? signal.tp2 : signal.tp1;
   const isBuy = signal.action === 'BUY';
 
   for (let k = entryIndex + 1; k <= last; k++) {
@@ -143,9 +144,11 @@ function printSummary(s: ReplaySummary, title: string): void {
 }
 
 export async function runReplay(mode: 'raw' | 'memory'): Promise<ReplaySummary> {
-  const stratLabel = config.strategy === 'enigma'
-    ? `ENIGMA (pression ${config.enigma.bullReversalMin}/${config.enigma.bearReversalMax}, SL ${config.enigma.slAtrMulti} ATR, cible ${config.enigma.targetRR}R)`
-    : `MA${config.fastPeriod}/${config.slowPeriod}`;
+  const stratLabel = config.strategy === 'wyckoff'
+    ? `WYCKOFF transcrit (SL ${config.wyckoff.slAtrMulti} ATR depuis l extreme, cible ${config.wyckoff.targetRR}R)`
+    : config.strategy === 'enigma'
+      ? `ENIGMA (pression ${config.enigma.bullReversalMin}/${config.enigma.bearReversalMax}, SL ${config.enigma.slAtrMulti} ATR, cible ${config.enigma.targetRR}R)`
+      : `MA${config.fastPeriod}/${config.slowPeriod}`;
   log.title(`REPLAY ${mode.toUpperCase()} — ${config.symbol} ${config.interval} — ${stratLabel}`);
 
   const set = await getCandles();
