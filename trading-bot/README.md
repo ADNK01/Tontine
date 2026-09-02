@@ -245,6 +245,42 @@ dimensionnement existe.
 > actif et un solde de 0.00 USD. Ce bot ne s'y connecte pas et ne peut pas y envoyer
 > d'ordre : il n'a aucun adaptateur broker. Rien de ce qu'il fait ne touche ce compte.
 
+
+## Trois façons de backtester
+
+| Voie | Ce qu'elle teste | Historique | Effort |
+|---|---|---|---|
+| **`tools/fetch-history.ts` + ce projet** | La transcription TypeScript | Des années, sur votre machine | **Le plus court** |
+| Strategy Tester MT4 (`mt4/`) | **L'indicateur réel** | Ce que votre courtier fournit | Compilation + historique MT4 |
+| TradingView (Pine Script) | Une réimplémentation | Des années, gratuit | À écrire |
+
+### La voie la plus rapide
+
+L'environnement où ce projet a été développé ne peut joindre aucune source de marché
+(refus de politique réseau) et son connecteur plafonne à 500 bougies. **Votre machine
+n'a pas cette limite.**
+
+```bash
+npx tsx tools/fetch-history.ts BTCUSDT 1d 6     # 6 ans de journalier
+npx tsx tools/fetch-history.ts ETHUSDT 1d 6
+
+SYMBOL=BTCUSDT INTERVAL=1d W_RSI_SWING_BARS=8 \
+  W_USE_ER_QUALITY=false W_USE_CUSUM=false npx tsx tools/sweep.ts
+SYMBOL=BTCUSDT INTERVAL=1d W_RSI_SWING_BARS=8 \
+  W_USE_ER_QUALITY=false W_USE_CUSUM=false npx tsx tools/nulltest.ts
+```
+
+Le téléchargeur pagine l'endpoint public Binance (aucune clé requise), déduplique,
+trie, et **n'écrit rien s'il échoue** — pas de données inventées. Si Binance est
+bloqué chez vous : `KLINES_BASE_URL=https://data-api.binance.vision`.
+
+### Ce que chaque voie ne dit pas
+
+Les voies 1 et 3 testent une **réimplémentation**, pas l'indicateur. La transcription
+est fidèle au code source (voir `STRATEGIE_WYCKOFF.md`) mais n'a jamais été confrontée
+flèche à flèche à l'indicateur compilé. Seul le Strategy Tester teste la chose réelle.
+Les deux se complètent : l'un donne du volume de données, l'autre de la fidélité.
+
 ## Configurer / experimenter
 
 Tout est dans `src/config.ts`, surchargeable par `.env` ou en ligne :
