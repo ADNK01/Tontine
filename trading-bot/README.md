@@ -30,6 +30,8 @@ Node 20+ requis.
 | `npm run memory:reset` | Vide `data/ledger.csv` et `data/learnings.md` |
 | `npm run diagnose` | Montre a quel etage du filtre les bougies sont eliminees |
 | `npm run propose` | Produit un ticket d'ordre complet — **n'envoie rien** |
+| `npm run signals` | Liste tous les signaux, en UTC et en heure serveur MT4 |
+| `npm run calibrate -- <iso>` | Detaille l'evaluation a une bougie donnee |
 
 Ordre d'utilisation recommande :
 
@@ -44,7 +46,7 @@ npm run memory:reset    # repartir de zero
 ## La strategie "Enigma Cipher S" (par defaut)
 
 > **Reconstruction, pas une copie.** Cette implementation est deduite des **noms et
-> valeurs des parametres** de l'indicateur MT4, lus sur des captures d'ecran. Le code
+> valeurs des parametres** de l'indicateur MT4 (v1.01, mode FF), lus sur des captures. Le code
 > source du `.ex4` n'est pas disponible : **la logique interne exacte est inconnue**.
 > Les fleches de l'indicateur et les signaux de ce bot peuvent differer. Comparez
 > signal par signal sur le meme graphique avant d'accorder la moindre confiance a ces
@@ -59,7 +61,7 @@ Lecture retenue : **un retournement apres balayage de liquidite**.
 | 3. Contexte | Sur les 8 bougies precedentes, le camp oppose domine | `Momentum_Bars` = 8, `Bear_Context_Max` = 0.4, `Bull_Context_Min` = 0.6 |
 | 4. Pression | La bougie referme a l'oppose du contexte | `Bull_Reversal_Min` = 0.72, `Bear_Reversal_Max` = 0.28 |
 | 5. Balayage | Elle casse l'extreme du contexte avant de refermer | `Min_Context_Depth` = 0.05 x ATR |
-| 6. HTF | L'unite superieure valide le sens | `Use_HTF` = true, `HTF_Period` = H1, `HTF_Min_Pressure` = 0.6 |
+| 6. HTF | La derniere bougie H1 **cloturee** doit avoir une pression tranchee ; le sens de la regle est configurable (`HTF_MODE`) | `Use_HTF` = true, `HTF_Period` = H1, `HTF_Min_Pressure` = 0.6 |
 | 7. Confirmation | Optionnelle, desactivee chez vous | `Require_Confirmation` = false |
 | Sortie | SL a 1.8 x ATR, objectifs a 1R / 2R / 3R | `SL_ATR_Multi`, `TP1/2/3_RR` |
 
@@ -67,103 +69,65 @@ La **pression** d'une bougie est `(cloture - plus bas) / (plus haut - plus bas)`
 1.0 = cloture sur le haut, 0.0 = cloture sur le bas.
 
 **Points d'incertitude assumes**, a verifier contre l'indicateur :
+- `HTF_Min_Pressure` : le seuil de 60% est confirme par le tableau de bord, mais le
+  **sens** de la regle reste indetermine (voir le calibrage ci-dessous). Mode par
+  defaut : `contrarian`.
 - `Min_Context_Depth` (0.05) : interprete comme la profondeur du balayage en multiples
-  d'ATR. C'est l'etage qui elimine le plus de candidats — si le vrai sens differe, le
-  nombre de signaux change beaucoup. `npm run diagnose` le montre.
+  d'ATR. `npm run diagnose` montre combien de candidats il elimine.
 - `Filter_Ready_Window` (5) : non implemente comme fenetre glissante ; les filtres sont
   evalues sur la bougie de signal.
 - Les filtres desactives chez vous (`Use_Volume`, `Use_Session`, `Use_Spread`,
   `Use_Divergence`, `Use_CUSUM`, `Use_ZScore`, `Use_ER_Quality`, reversals ATR/RS) ne
   sont **pas** implementes, puisqu'ils sont a `false` dans votre configuration.
 
-### Ce que ca donne sur donnees reelles
+### Calibrage contre les fleches de l'indicateur
 
-Fenetre BTCUSD M15, 400 bougies reelles (29 aout -> 2 sept), bougies H1 alignees sur l'horloge :
+Une fleche a pu etre calibree exactement. Son objet MT4 portait `ECS_Line_1788221100_TP3` :
+l'entier est un timestamp Unix.
 
-```
-Bougies analysees : 375
-SIGNAUX RETENUS   : 0 achat, 0 vente
-    28  Range trop petit          75  Corps trop faible
-   233  Pression/contexte hors seuils
-    29  Balayage trop court       10  Filtre H1 contraire
-```
-
-**Zero signal en quatre jours.** Comme l'indicateur, lui, dessine des fleches sur la
-meme periode, cela veut dire que **la reconstruction diverge de l'original**. Le
-coupable est identifie par test de sensibilite :
-
-| Configuration | Signaux sur 375 bougies |
+| | |
 |---|---|
-| Tous les filtres (defaut) | **0** |
-| Sans le filtre H1 | 10 |
-| Sans le filtre de balayage | 4 |
-| Sans H1 ni balayage | 39 |
-| H1 assoupli a 0.5 | 0 |
+| Timestamp de la fleche | 1788221100 = **31/08/2026 21:05 UTC** |
+| Affichage MT4 | 01/09 00:05 -> **le serveur FBS tourne en UTC+3** |
+| Bougie (barre d'etat MT4) | O 78789.70 H 78860.20 L 78692.10 C 78860.20 |
+| Unite de temps | **M5** (pas M15) |
 
-C'est **l'interpretation de `HTF_Min_Pressure` qui bloque tout**. Ma lecture — "la
-bougie H1 precedente doit clore a au moins 60% de son range dans le sens du trade" —
-est trop stricte pour etre celle de l'indicateur.
+Ce que cette bougie dit de la reconstruction, valeur par valeur :
 
-**Calibrage necessaire** : relevez l'horodatage exact de 3 a 5 fleches sur votre
-graphique (date, heure, sens). Ces points suffisent a retrouver la vraie regle H1 :
-il suffit de garder l'interpretation qui reproduit vos fleches et rejette le reste.
+| Etage | Valeur mesuree | Seuil | Verdict |
+|---|---|---|---|
+| Pression de la bougie | **100 %** (cloture = plus haut) | achat >= 72 % | passe |
+| Contexte sur 8 bougies | **34 %** | achat <= 40 % | passe |
+| Efficacite du corps | 0.40 | >= 0.25 | passe |
+| Pression H1 (derniere close) | **21 %** — donc baissiere | mon ancienne regle : >= 60 % | **contredit** |
 
-## D'ou viennent les donnees
+**Les definitions de pression et de contexte sont donc justes** — elles reproduisent les
+valeurs du tableau de bord de l'indicateur (`Live Pressure: Current / Context`,
+`HTF - last closed bar: Pressure ... (min 60%)`). En revanche, l'indicateur a dessine un
+**achat alors que la H1 etait baissiere a 21 %**. La regle "la H1 doit pousser dans le
+sens du trade" est donc fausse.
 
-1. **Source par defaut** : endpoint public Binance `GET /api/v3/klines`. Aucune cle.
-2. **Repli** : si l'endpoint est injoignable (reseau bloque, 403, timeout), le bot
-   bascule sur un snapshot de bougies **reelles** archive dans `data/cache/`, et
-   l'annonce en gros dans les logs avec la fenetre de dates concernee.
-3. Si les deux echouent, le bot **echoue bruyamment**. Il n'invente jamais de bougie.
+`HTF_MODE` rend l'hypothese configurable :
 
-Pour interdire le repli et exiger du temps reel : `ALLOW_CACHE_FALLBACK=false`.
+| Mode | Regle | Signaux sur 498 bougies M5 | Compatible avec la fleche connue |
+|---|---|---|---|
+| `aligned` | la H1 pousse dans le sens du trade | 2 | **non — exclu** |
+| `contrarian` | on fade l'exces H1 (defaut) | 8 | oui |
+| `clear` | la H1 a une direction nette, peu importe laquelle | 10 | oui |
+| `off` | filtre desactive | 12 | oui |
 
-## Execution papier
+Une seule fleche ne peut pas departager les trois derniers modes. **`npm run signals`**
+sort la liste des signaux en heure serveur MT4, prete a comparer avec vos fleches :
 
-`src/execution.ts` ne fait que construire un objet d'ordre et le logger.
-Le garde-fou `assertPaperMode()` refuse de s'executer si `TRADING_MODE` vaut
-autre chose que `paper`. Brancher un vrai broker demanderait d'ecrire un
-adaptateur qui n'existe pas dans ce depot — c'est volontaire.
+```
+SENS  UTC               SERVEUR MT4 (UTC+3)  PRIX      SL        TP1
+BUY   2026-09-01 01:30  2026-09-01 04:30     78477.67  78272.26  78683.08
+SELL  2026-09-01 03:05  2026-09-01 06:05     78449.46  78607.31  78291.61
+...
+```
 
-### Mode MCP / API paper optionnel
-
-Non branche pour l'instant. Si vous ajoutez un jour un adaptateur broker en
-paper/test **deja verifie**, respectez ces regles :
-- les identifiants restent dans la config du client MCP ou dans des variables
-  d'environnement serveur, jamais dans le code ni dans le chat ;
-- preferez une cle API restreinte ou un sous-compte de test ;
-- l'adaptateur reste derriere `assertPaperMode()` ;
-- ajoutez alors les scripts `broker:check` et `broker:preview` (verification de
-  compte et previsualisation seulement, jamais d'envoi d'ordre).
-
-## La memoire
-
-Deux fichiers, dans `data/` :
-
-- **`ledger.csv`** — `timestamp,symbol,action,price,quantity,reason,mode,outcome,pnl`
-  Une ligne par trade papier, par resultat de replay et par SKIP decide par la memoire.
-- **`learnings.md`** — une section par setup, en francais clair, ecrite uniquement
-  quand des pertes reelles repetees le justifient.
-
-Les deux sont ignores par git : votre memoire est locale a votre experimentation.
-
-### Quand la memoire bloque un signal
-
-Les trois conditions doivent etre reunies :
-1. au moins `MEMORY_MIN_LOSSES` pertes **reelles** deja enregistrees sur ce setup ;
-2. un taux de reussite sous `MEMORY_MAX_WIN_RATE` ;
-3. une lecon correspondante presente dans `learnings.md`.
-
-Sinon le signal passe, et le log dit pourquoi. Aucune perte n'est semee a la main,
-aucun echec n'est force. Si la memoire est vide, `replay:memory` vous dit de lancer
-`replay:raw` d'abord.
-
-**Anti-lookahead** : lors d'un replay, seules les lignes de ledger anterieures au
-setup evalue sont prises en compte. `learnings.md`, lui, est un fichier global —
-si vous le remplissez avec la meme fenetre que celle que vous rejouez, la comparaison
-est *in-sample*. Pour un test propre : construisez la memoire sur une fenetre, puis
-rejouez sur une autre (autre `SYMBOL`, autre `INTERVAL`, autre periode).
-
+Regardez si des fleches existent a ces heures sur votre graphique. Celles qui manquent,
+et celles que le bot rate, designent le mode a retenir.
 
 ## Mode proposition : du signal a l'ordre
 

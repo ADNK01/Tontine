@@ -11,9 +11,9 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import { log } from './logger.js';
-import { getCandles, closedCandles } from './market.js';
+import { getCandles, getHtfCandles, closedCandles } from './market.js';
 import { evaluateLatest } from './strategy.js';
-import { aggregate } from './indicators.js';
+import { resolveHtf } from './replay.js';
 import { sizePosition, minimumViableBalance } from './sizing.js';
 import { evaluateMemory } from './adaptiveFilter.js';
 import { memoryFilesExist, readLedger, readLearnings } from './memory.js';
@@ -71,7 +71,7 @@ export async function runPropose(): Promise<OrderTicket> {
   const set = await getCandles();
   const candles = closedCandles(set.candles);
   const last = candles[candles.length - 1];
-  const htf = config.strategy === 'enigma' && config.enigma.useHtf ? aggregate(candles, config.enigma.htfFactor) : undefined;
+  const htf = await resolveHtf(candles);
   const signal = evaluateLatest(candles, { htf });
 
   const ageMinutes = last ? Math.round((Date.now() - last.openTime) / 60000) : Number.NaN;

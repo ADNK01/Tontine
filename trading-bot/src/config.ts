@@ -15,8 +15,10 @@ const bool = (v: string | undefined, d: boolean): boolean =>
 export const config = {
   // --- Marche ---
   symbol: process.env.SYMBOL ?? 'BTCUSDT',
-  interval: (process.env.INTERVAL ?? '15m') as Interval,
+  interval: (process.env.INTERVAL ?? '5m') as Interval,
   candleLimit: num(process.env.CANDLE_LIMIT, 500),
+  /** Unite de temps du filtre superieur, chargee separement quand elle est disponible. */
+  htfInterval: (process.env.HTF_INTERVAL ?? '1h') as Interval,
   klinesBaseUrl: process.env.KLINES_BASE_URL ?? 'https://api.binance.com',
   httpTimeoutMs: num(process.env.HTTP_TIMEOUT_MS, 15000),
   /** Repli sur le snapshot de bougies REELLES si l'API publique est injoignable. */
@@ -49,6 +51,14 @@ export const config = {
     /** Nombre de bougies de l'unite courante formant une bougie HTF (M15 -> H1 = 4). */
     htfFactor: num(process.env.HTF_FACTOR, 4),
     htfMinPressure: num(process.env.HTF_MIN_PRESSURE, 0.6),
+    /**
+     * Interpretation du filtre HTF — indeterminee tant qu'on n'a pas plusieurs fleches.
+     *  aligned    : la H1 doit pousser DANS le sens du trade (pression >= seuil pour un achat)
+     *  contrarian : la H1 doit pousser CONTRE (on fade l'extreme H1) — compatible avec la fleche connue
+     *  clear      : la H1 doit seulement avoir une direction NETTE, dans un sens ou l'autre
+     *  off        : filtre desactive
+     */
+    htfMode: (process.env.HTF_MODE ?? 'contrarian') as 'aligned' | 'contrarian' | 'clear' | 'off',
     htfMinBodyAtr: num(process.env.HTF_MIN_BODY_ATR, 0.0),
     slAtrMulti: num(process.env.SL_ATR_MULTI, 1.8),
     tp1RR: num(process.env.TP1_RR, 1.0),
@@ -85,6 +95,9 @@ export const config = {
   memoryMaxWinRate: num(process.env.MEMORY_MAX_WIN_RATE, 0.5),
 
   // --- Garde-fous ---
+  /** Decalage du serveur MT4 par rapport a UTC, pour comparer les horodatages aux fleches. */
+  serverUtcOffsetHours: num(process.env.SERVER_UTC_OFFSET, 3),
+
   /** Verrou global : seule la valeur 'paper' est acceptee par le module d'execution. */
   tradingMode: (process.env.TRADING_MODE ?? 'paper').toLowerCase(),
 } as const;

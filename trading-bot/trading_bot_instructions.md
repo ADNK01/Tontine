@@ -8,7 +8,7 @@ Un bot de **paper-trading** en TypeScript/Node.js qui lit des bougies reelles,
 applique une strategie de croisement de moyennes mobiles, filtre par le risque,
 simule un ordre papier, et apprend de ses propres resultats reels.
 
-- Marche de depart : **BTCUSD**, interval **M15** (celui du graphique MT4)
+- Marche de depart : **BTCUSD**, interval **M5** (celui du graphique MT4)
 - Aucun trade reel, jamais. Le paper-trading vient en premier parce qu'une
   strategie non verifiee sur donnees reelles n'a aucune valeur.
 
@@ -33,7 +33,9 @@ Etages du filtre, dans l'ordre :
 3. Contexte sur `Momentum_Bars` (8) bougies : pression moyenne <= 0.4 (achat) ou >= 0.6 (vente).
 4. Pression de la bougie de signal >= 0.72 (achat) ou <= 0.28 (vente).
 5. Balayage de l'extreme du contexte >= `Min_Context_Depth` (0.05) x ATR.
-6. Filtre H1 : pression >= `HTF_Min_Pressure` (0.6) dans le sens du trade.
+6. Filtre H1 sur la derniere bougie cloturee, seuil `HTF_Min_Pressure` (0.6). Le SENS
+   de la regle est indetermine : `HTF_MODE` = aligned / contrarian / clear / off.
+   La seule fleche calibree (achat avec H1 a 21%) exclut `aligned`. Defaut : `contrarian`.
 7. Confirmation desactivee (`Require_Confirmation` = false).
 
 Sortie : **SL a 1.8 x ATR**, objectifs a 1R / 2R / 3R. Le replay sort au SL ou au TP,

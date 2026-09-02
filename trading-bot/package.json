@@ -13,7 +13,9 @@
     "replay:memory": "tsx src/index.ts replay:memory",
     "memory:reset": "tsx src/index.ts memory:reset",
     "diagnose": "tsx src/index.ts diagnose",
-    "propose": "tsx src/index.ts propose"
+    "propose": "tsx src/index.ts propose",
+    "calibrate": "tsx src/index.ts calibrate",
+    "signals": "tsx src/index.ts signals"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -2,9 +2,9 @@
  * Diagnostic du filtre : combien de bougies tombent a chaque etage.
  * Sert a comprendre pourquoi la strategie signale peu, et quel parametre est decisif.
  */
-import { getCandles, closedCandles } from './market.js';
+import { getCandles, getHtfCandles, closedCandles } from './market.js';
 import { evaluateAt } from './strategy.js';
-import { aggregate } from './indicators.js';
+import { resolveHtf } from './replay.js';
 import { config } from './config.js';
 import { log } from './logger.js';
 
@@ -12,7 +12,7 @@ export async function runDiagnose(): Promise<void> {
   log.title(`DIAGNOSTIC DU FILTRE — ${config.symbol} ${config.interval} — strategie ${config.strategy}`);
   const set = await getCandles();
   const candles = closedCandles(set.candles);
-  const htf = config.strategy === 'enigma' && config.enigma.useHtf ? aggregate(candles, config.enigma.htfFactor) : undefined;
+  const htf = await resolveHtf(candles);
 
   const stages = new Map<string, number>();
   const bump = (k: string): void => void stages.set(k, (stages.get(k) ?? 0) + 1);

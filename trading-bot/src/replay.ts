@@ -13,7 +13,7 @@
  */
 import { config } from './config.js';
 import { log } from './logger.js';
-import { getCandles, closedCandles } from './market.js';
+import { getCandles, getHtfCandles, closedCandles } from './market.js';
 import { evaluateAt } from './strategy.js';
 import { checkRisk } from './risk.js';
 import { aggregate } from './indicators.js';
@@ -23,6 +23,20 @@ import { sizePosition } from './sizing.js';
 import type { Candle, ReplaySkip, ReplaySummary, ReplayTrade, StrategySignal } from './types.js';
 
 const iso = (t: number): string => new Date(t).toISOString().replace('T', ' ').slice(0, 16);
+
+/** Vraies bougies HTF si une source dediee existe, sinon agregation des bougies courantes. */
+export async function resolveHtf(candles: Candle[]): Promise<Candle[] | undefined> {
+  if (config.strategy !== 'enigma' || !config.enigma.useHtf) return undefined;
+  const set = await getHtfCandles();
+  if (set) {
+    const c = closedCandles(set.candles);
+    log.step('HTF', `Source dediee : ${set.sourceLabel} (${c.length} bougies cloturees).`);
+    return c;
+  }
+  const agg = aggregate(candles, config.enigma.htfFactor);
+  log.step('HTF', `Pas de source ${config.htfInterval} dediee : agregation ${config.enigma.htfFactor} x ${config.interval} (${agg.length} bougies).`);
+  return agg;
+}
 
 interface ExitResult {
   exit: number;
@@ -136,8 +150,7 @@ export async function runReplay(mode: 'raw' | 'memory'): Promise<ReplaySummary> 
 
   const set = await getCandles();
   const candles: Candle[] = closedCandles(set.candles);
-  const htf = config.strategy === 'enigma' && config.enigma.useHtf ? aggregate(candles, config.enigma.htfFactor) : undefined;
-  if (htf) log.step('HTF', `${htf.length} bougies superieures reconstruites (${config.enigma.htfFactor} x ${config.interval}).`);
+  const htf = await resolveHtf(candles);
 
   const warmup = Math.max(config.slowPeriod, config.regimePeriod, config.atrPeriod + config.enigma.momentumBars + 1);
   if (candles.length < warmup + config.horizon + 5) {

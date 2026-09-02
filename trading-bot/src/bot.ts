@@ -4,9 +4,9 @@
  */
 import { config } from './config.js';
 import { log } from './logger.js';
-import { getCandles, closedCandles } from './market.js';
+import { getCandles, getHtfCandles, closedCandles } from './market.js';
 import { evaluateLatest } from './strategy.js';
-import { aggregate } from './indicators.js';
+import { resolveHtf } from './replay.js';
 import { checkRisk } from './risk.js';
 import { assertPaperMode, simulatePaperOrder } from './execution.js';
 import { evaluateMemory } from './adaptiveFilter.js';
@@ -28,7 +28,7 @@ export async function runScan(): Promise<Action> {
   }
   log.step('MARCHE', `${candles.length} bougies cloturees. Derniere : ${new Date(last.openTime).toISOString()} cloture ${last.close}`);
 
-  const htf = config.strategy === 'enigma' && config.enigma.useHtf ? aggregate(candles, config.enigma.htfFactor) : undefined;
+  const htf = await resolveHtf(candles);
   const signal = evaluateLatest(candles, { htf });
   if (!signal) {
     log.error('Pas assez de bougies pour calculer les moyennes mobiles.');

@@ -80,3 +80,27 @@ export async function getCandles(
 export function closedCandles(candles: Candle[]): Candle[] {
   return candles.slice(0, -1);
 }
+
+/**
+ * Bougies de l'unite superieure.
+ * On prefere de VRAIES bougies HTF (snapshot ou API) a une agregation des bougies
+ * courantes : l'agregation ne peut pas remonter plus loin que la fenetre chargee,
+ * et l'ATR de l'unite superieure demande beaucoup d'historique.
+ * Renvoie null si aucune source dediee n'est disponible — l'appelant agrege alors.
+ */
+export async function getHtfCandles(
+  symbol: string = config.symbol,
+  htfInterval: Interval = config.htfInterval,
+): Promise<CandleSet | null> {
+  try {
+    const candles = await fetchFromHttp(symbol, htfInterval, config.candleLimit);
+    return { candles, source: 'live-http', sourceLabel: `${htfInterval} temps reel (${candles.length} bougies)` };
+  } catch {
+    try {
+      const { candles, label } = await loadFromCache(symbol, htfInterval);
+      return { candles, source: 'cached-snapshot', sourceLabel: `${htfInterval} snapshot — ${label}` };
+    } catch {
+      return null;
+    }
+  }
+}

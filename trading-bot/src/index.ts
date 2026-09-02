@@ -4,6 +4,8 @@ import { runScan } from './bot.js';
 import { runReplay } from './replay.js';
 import { runDiagnose } from './diagnose.js';
 import { runPropose } from './proposal.js';
+import { runCalibrate } from './calibrate.js';
+import { runSignals } from './signals.js';
 import { resetMemory } from './memory.js';
 import { log } from './logger.js';
 import { paths } from './config.js';
@@ -17,6 +19,8 @@ Usage : npm run <commande>
   memory:reset    Vide data/ledger.csv et data/learnings.md
   diagnose        Montre a quel etage du filtre les bougies sont eliminees
   propose         Produit un ticket d ordre complet — n envoie RIEN
+  calibrate <iso> Detaille l evaluation a une bougie donnee (comparaison aux fleches)
+  signals         Liste tous les signaux, en UTC et en heure serveur MT4
 `;
 
 async function main(): Promise<void> {
@@ -33,6 +37,12 @@ async function main(): Promise<void> {
       break;
     case 'propose':
       await runPropose();
+      break;
+    case 'signals':
+      await runSignals();
+      break;
+    case 'calibrate':
+      await runCalibrate(process.argv[3] ?? '');
       break;
     case 'diagnose':
       await runDiagnose();
